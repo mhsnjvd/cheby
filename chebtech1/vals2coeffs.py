@@ -40,11 +40,11 @@ def vals2coeffs(values):
 
     # Get the length of the input:
     # n = size(values, 1);
-    n = values.shape[0]
+    n = len(values)
 
     # % Trivial case (constant):
     if n <= 1:
-        coeffs = values
+        coeffs = np.copy(values)
         return coeffs
 
     # [TODO] check for symmetry

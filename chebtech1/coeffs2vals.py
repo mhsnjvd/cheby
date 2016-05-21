@@ -39,11 +39,11 @@ def coeffs2vals(coeffs):
     # % Get the length of the input:
     # [n, m] = size(coeffs);
 
-    n = coeffs.shape[0]
+    n = len(coeffs)
 
     # % Trivial case (constant):
     if n <= 1:
-        values = coeffs
+        values = np.copy(coeffs)
         return values
 
     # % check for symmetry
