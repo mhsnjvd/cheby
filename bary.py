@@ -37,7 +37,7 @@ def bary(*args):
 
     if len(args) < 4:
         xk = chebpts.chebpts(n)[0]
-        vk = barywts.barywts(n)[0]
+        vk = barywts.barywts(n)
     else:
         xk = args[2]
         vk = args[3]
@@ -59,6 +59,9 @@ def bary(*args):
         return fx
 
     # The main loop:
+    # Ignore divide by 0 warning:
+    # [TODO] how to restore the warning state?
+    np.seterr(divide='ignore', invalid='ignore')
     if len(x) < 4*len(xk):
         # Loop over evaluation points
         # Note: The value "4" here was determined experimentally.

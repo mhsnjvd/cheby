@@ -1,6 +1,6 @@
 import numpy as np
 
-import angles, barywts, quadwts
+from . import angles, barywts, quadwts
 
 def chebpts(n):
     """
