@@ -1,6 +1,9 @@
 import numpy as np
 from . import chebpts, barywts
-from chebfun import bary
+
+import sys
+sys.path.append('../../chebpy')
+from chebpy import bary
 
 def bary(x, fvals):
     """
@@ -40,6 +43,6 @@ def bary(x, fvals):
     vk = barywts.barywts(n);
 
     # Call BARY:
-    fx = chebfun.bary.bary(x, fvals, xk, vk);
+    fx = chebpy.bary.bary(x, fvals, xk, vk);
 
     return fx

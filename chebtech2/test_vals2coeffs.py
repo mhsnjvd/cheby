@@ -1,21 +1,21 @@
 import numpy as np
-import coeffs2vals
+import vals2coeffs
 import isequal_numerically
 
-def test_coeffs2vals(coeffs):
-    values = coeffs2vals.coeffs2vals(coeffs)
-    # print('coeffs = %s' % coeffs)
+def test_vals2coeffs(values):
+    coeffs = vals2coeffs.vals2coeffs(values)
     # print('values = %s' % values) 
-    return  values
+    # print('coeffs = %s' % coeffs)
+    return coeffs
 
 if __name__ == "__main__":
 
     # Initialize list for test results
     pass_list = []
 
-    coeffs = np.array([])
-    values = test_coeffs2vals(coeffs)
-    test_array = (values == coeffs)
+    values = np.array([])
+    coeffs = test_vals2coeffs(values)
+    test_array = (coeffs == values)
     if test_array.all():
         print('pass')
         pass_list.append(True)
@@ -23,9 +23,9 @@ if __name__ == "__main__":
         print('pass')
         pass_list.append(False)
 
-    coeffs = np.array([1])
-    values = test_coeffs2vals(coeffs)
-    test_array = (values == coeffs)
+    values = np.array([1])
+    coeffs = test_vals2coeffs(values)
+    test_array = (coeffs == values)
     if test_array.all():
         print('pass')
         pass_list.append(True)
@@ -33,10 +33,10 @@ if __name__ == "__main__":
         print('fail')
         pass_list.append(False)
 
-    coeffs = np.array([1., 0.])
-    values = test_coeffs2vals(coeffs)
+    values = np.array([1., 1.])
+    coeffs = test_vals2coeffs(values)
     test_value = isequal_numerically.isequal_numerically(
-            values, np.array([1., 1.]))
+            coeffs, np.array([1., 0.]))
     if test_value:
         print('pass')
         pass_list.append(True)
@@ -44,11 +44,10 @@ if __name__ == "__main__":
         print('fail')
         pass_list.append(False)
 
-
-    coeffs = np.array([0, 0, 1])
-    values = test_coeffs2vals(coeffs)
+    values = np.array([1., -1., 1.])
+    coeffs = test_vals2coeffs(values)
     test_value = isequal_numerically.isequal_numerically(
-            values, np.array([1., -1., 1.]))
+            coeffs, np.array([0, 0, 1]))
     if test_value:
         print('pass')
         pass_list.append(True)
@@ -56,11 +55,10 @@ if __name__ == "__main__":
         print('fail')
         pass_list.append(False)
 
-
-    coeffs = np.array([0, 0, 0, 1])
-    values = test_coeffs2vals(coeffs)
+    values = np.array([-1., 1., -1., 1.])
+    coeffs = test_vals2coeffs(values)
     test_value = isequal_numerically.isequal_numerically(
-            values, np.array([-1., 1., -1., 1.]))
+            coeffs, np.array([0, 0, 0, 1]))
     if test_value:
         print('pass')
         pass_list.append(True)
@@ -69,6 +67,6 @@ if __name__ == "__main__":
         pass_list.append(False)
 
     if pass_list.count(True) == len(pass_list):
-        print('All tests in %s passed' % test_coeffs2vals.__name__ )
+        print('All tests in %s passed' % test_vals2coeffs.__name__ )
     else:
-        print('%s failed' % test_coeffs2vals.__name__ )
+        print('%s failed' % test_vals2coeffs.__name__ )

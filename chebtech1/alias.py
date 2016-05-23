@@ -55,7 +55,7 @@ def alias(coeffs, m):
         return aliased_coeffs
 
 
-    aliased_coeffs = np.copy(coeffs)
+    aliased_coeffs = coeffs.copy()
     if m > n/2:
         # If m > n/2, only single coefficients are aliased, and we can vectorise.
         #  j = ((m + 1):n).';
@@ -67,7 +67,7 @@ def alias(coeffs, m):
         k = np.abs((j + m - 1)%(2*m) - m + 1)
         p = (j+m)//(2*m)
         t = (-1)**p;
-        aliased_coeffs[k] = coeffs[k] + t*coeffs[j];
+        aliased_coeffs[k] = aliased_coeffs[k] + t*aliased_coeffs[j];
     else:
         #% Otherwise we must do everything in a tight loop. (Which is slower!)
         #for j = (m + 1):n
@@ -80,7 +80,7 @@ def alias(coeffs, m):
         for j in np.r_[m:n]:
             k = np.abs((j + m - 1)%(2*m) - m + 1)
             sgn = 1 - 2*(((j+m)//(2*m))% 2)
-            aliased_coeffs[k] = coeffs[k] + sgn*coeffs[j]
+            aliased_coeffs[k] = aliased_coeffs[k] + sgn*aliased_coeffs[j]
     
 
     # Truncate:
