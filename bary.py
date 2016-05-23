@@ -1,5 +1,6 @@
 import numpy as np
 from chebtech2 import chebpts, barywts
+import num2nparray
 
 def bary(*args):
     """
@@ -31,8 +32,9 @@ def bary(*args):
     """
 
     # Parse inputs:
-    x = args[0]
-    fvals = args[1]
+    x = num2nparray.num2nparray(args[0])
+    fvals = num2nparray.num2nparray(args[1])
+
     n = len(fvals)
 
     if len(args) < 4:

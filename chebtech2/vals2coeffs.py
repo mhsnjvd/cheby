@@ -8,9 +8,8 @@ def vals2coeffs(values):
     #   k-th 1st-kind Chebyshev polynomial) interpolates the data [V(1) ; ... ;
     #   V(N+1)] at Chebyshev points of the 2nd kind.
     #
-    #   If the input V is an (N+1)xM matrix, then C = VALS2COEFFS(V) returns the
-    #   (N+1)xM matrix of coefficients C such that F_j(x) = C(1,j)*T_0(x) + ... +
-    #   C(N+1,j)*T_N(x) interpolates [V(1,j) ; ... ; V(N+1,j)] for j = 1:M.
+    #   Input: values must be of type numpy.ndarray
+    #   Output: a numpy.ndarray of the same size as values
     #
     # See also COEFFS2VALS, CHEBPTS.
 
@@ -35,9 +34,6 @@ def vals2coeffs(values):
 
     # Get the length of the input:
     n = len(values)
-
-    if isinstance(values, list):
-        values = np.asarray(values)
 
     # Trivial case (constant):
     if n <= 1:

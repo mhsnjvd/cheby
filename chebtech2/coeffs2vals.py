@@ -8,9 +8,9 @@ def coeffs2vals(coeffs):
     #   C(1,1)*T_{0}(x_i) + ... + C(N,1)*T_{N-1}(x_i), where the x_i are
     #   2nd-kind Chebyshev nodes.
     #
-    #   If the input C is an (N+1)xM matrix then V = COEFFS2VALS(C) returns the
-    #   (N+1)xM matrix of values V such that V(i,j) = P_j(x_i) = C(1,j)*T_{0}(x_i)
-    #   + C(2,j)*T_{1}(x_i) + ... + C(N,j)*T_{N-1}(x_i).
+    #  Input: coeffs is numpy.ndarray 
+    #  Output: values is a numpy.ndarray of the same length as coeffs
+    #   
     #
     # See also VALS2COEFFS, CHEBPTS.
 
@@ -34,9 +34,6 @@ def coeffs2vals(coeffs):
 
     # Get the length of the input:
     n = len(coeffs)
-
-    if isinstance(coeffs, list):
-        coeffs = np.asarray(coeffs)
 
     # Trivial case (constant or empty):
     if n <= 1:
