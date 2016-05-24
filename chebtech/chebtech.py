@@ -1,7 +1,11 @@
 import numpy as np
 import bary
 import num2nparray
-from chebtech2 import vals2coeffs, coeffs2vals
+import iszero_numerically
+import chebtech2
+import chebtech2.coeffs2vals
+import chebtech2.vals2coeffs
+import matplotlib.pyplot as plt
 
 class Chebtech:
     # Initialize properties of the object
@@ -15,12 +19,12 @@ class Chebtech:
             coeffs = kwargs['coeffs']
             coeffs = num2nparray.num2nparray(coeffs)
             self.coeffs = coeffs
-            self.values = coeffs2vals.coeffs2vals(coeffs)
+            self.values = chebtech2.coeffs2vals.coeffs2vals(coeffs)
         if 'values' in keys:
             values = kwargs['values']
             values = num2nparray.num2nparray(values)
             self.values = values
-            self.coeffs = vals2coeffs.vals2coeffs(values)
+            self.coeffs = chebtech2.vals2coeffs.vals2coeffs(values)
         if 'fun' in keys:
             self.fun = kwargs['fun']
 
@@ -32,6 +36,48 @@ class Chebtech:
         # Evaluate the object at the point(s) x:
         fx = bary.bary(x, self.values)
         return fx
+
+    def plot(self):
+        x = np.linspace(-1, 1, 2001)
+        plt.plot(x, self[x]) 
+        plt.show()
+
+    def isreal(self):
+        if iszero_numerically.iszero_numerically(self.values.imag):
+            return True
+        else:
+            return False
+
+    def isimag(self):
+        if iszero_numerically.iszero_numerically(self.values.real):
+            return True
+        else:
+            return False
+
+    def abs(self):
+        #ABS   Absolute value of a CHEBTECH object.
+        #   ABS(F) returns the absolute value of F, where F is a CHEBTECH 
+        #   object with no roots in [-1 1]. 
+        #   If ~isempty(roots(F)), then ABS(F) will return garbage
+        #   with no warning. F may be complex.
+
+        #  Copyright 2016 by The University of Oxford and The Chebfun Developers.
+        #  See http://www.chebfun.org/ for Chebfun information.
+
+        if self.isreal() or self.isimag():
+            # Convert to values and then compute ABS(). 
+            return Chebtech(values=np.abs(self.values))
+        else:
+            # [TODO]
+            # f = compose(f, @abs, [], [], varargin{:});
+            # [TODO]: Is the following a true copy?
+            f = self
+            return f
+
+    def roots(self):
+
+            
+
 
     def sum(self):
         """
@@ -85,7 +131,7 @@ class Chebtech:
             coeffs = np.r_[self.coeffs, np.zeros(m-n)]
             result.coeffs = other.coeffs + coeffs
 
-        result.values = coeffs2vals.coeffs2vals(result.coeffs)
+        result.values = chebtech2.coeffs2vals.coeffs2vals(result.coeffs)
 
         return result
 
@@ -100,7 +146,7 @@ class Chebtech:
             coeffs = np.r_[self.coeffs, np.zeros(m-n)]
             result.coeffs = other.coeffs - coeffs
 
-        result.values = coeffs2vals.coeffs2vals(result.coeffs)
+        result.values = chebtech2.coeffs2vals.coeffs2vals(result.coeffs)
 
         return result
 

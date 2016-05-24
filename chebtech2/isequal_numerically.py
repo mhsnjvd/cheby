@@ -16,4 +16,3 @@ def isequal_numerically(u, v, tol=defaultTol):
         return True
     else:
         return False
-
