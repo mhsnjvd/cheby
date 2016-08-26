@@ -1,10 +1,8 @@
 import numpy as np
 
 def num2nparray(x):
-    """
-    Convert a number or a list of numbers
-    to a numpy array
-    """
+    """Convert a number or a list of numbers to a numpy array."""
+
     #try:
     if isinstance(x, list):
         x = np.array(x)
@@ -17,4 +15,3 @@ def num2nparray(x):
 
     #except TypeError:
     print('num2nparray: The input type must be int, float, list or numpy.ndarray')
-
