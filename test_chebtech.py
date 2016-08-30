@@ -1,6 +1,6 @@
+import unittest
 import numpy as np
 from chebtech.chebtech import Chebtech
-#from chebtech.roots import roots
 
 if __name__ == "__main__":
     f = Chebtech(coeffs=[0, 0, 1])
@@ -27,3 +27,27 @@ if __name__ == "__main__":
 
     #r = roots(f)
     #print(r)
+
+
+class TestChebtechMethods(unittest.TestCase):
+
+    def test_ctor(self):
+        f = Chebtech()
+        self.assertEqual(len(f), 0)
+        self.assertTrue(f is not None)
+        self.assertFalse(fj
+
+    def test_coeffs2vals(self):
+        self.assertTrue('FOO'.isupper())
+        self.assertFalse('Foo'.isupper())
+
+    def test_vals2coeffs(self):
+        s = 'hello world'
+        self.assertEqual(s.split(), ['hello', 'world'])
+        # check that s.split fails when the separator is not a string
+        with self.assertRaises(TypeError):
+            s.split(2)
+
+if __name__ == '__main__':
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestChebtechMethods)
+    unittest.TextTestRunner(verbosity=2).run(suite)
