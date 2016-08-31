@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import linalg
-import bary
+#import bary
 import matplotlib.pyplot as plt
 
 def iszero_numerically(v, tol=None):
