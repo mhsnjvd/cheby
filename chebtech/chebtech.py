@@ -20,7 +20,7 @@ def iszero_numerically(v, tol=None):
         return False
 
 
-def refine_resampling(op, values, pref):
+def refine_by_resampling(op, values):
     #REFINERESAMPLING   Default refinement function for resampling scheme.
 
     min_samples = 2**4 + 1
@@ -48,7 +48,7 @@ def refine_resampling(op, values, pref):
             give_up = False
         else:
             give_up = True
-            return
+            return values, give_up
     else:
         give_up = False;
    
@@ -63,40 +63,40 @@ def refine_resampling(op, values, pref):
     
     return values, give_up
 
-function [values, give_up] = refineNested(op, values, pref)
-#REFINENESTED  Default refinement function for single ('nested') sampling.
+def refine_by_nesting(op, values):
+    """REFINENESTED  Default refinement function for single ('nested') sampling."""
 
-    if ( isempty(values) )
+    min_samples = 2**4 + 1
+    max_samples = 2**16 + 1
+
+    if ( values.size == 0 ):
         # The first time we are called, there are no values
         # and REFINENESTED is the same as REFINERESAMPLING.
-        [values, give_up] = refineResampling(op, values, pref);
-
-    else
-    
+        values, give_up = refine_by_esampling(op, values, pref);
+    else:
         # Compute new n by doubling (we must do this when not resampling).
-        n = 2*size(values, 1) - 1;
+        n = 2*len(values) - 1;
         
         # n is too large:
-        if ( n > pref.maxLength )
-            give_up = true;
-            return
-        else
-            give_up = false;
-        end
+        if ( n > max_samples ):
+            give_up = True
+            return values, give_up
+        else:
+            give_up = False
         
         # 2nd-kind Chebyshev grid:
-        x = chebtech2.chebpts(n);
+        x = Chebtech.chebpts(n);
         # Take every 2nd entry:
-        x = x(2:2:end-1);
+        # x = x(2:2:end-1);
+        x = x[1:-1:2]
 
         # Shift the stored values:
-        values(1:2:n,:) = values;
+        # values(1:2:n,:) = values;
+        values[:n:2] = values
         # Compute and insert new ones:
-        values(2:2:end-1,:) = feval(op, x);
-
-    end
-end
-
+        # values(2:2:end-1,:) = feval(op, x);
+        values[1::2] = op(x)
+        return values, give_up
 
 class Chebtech:
     # Initialize properties of the object
