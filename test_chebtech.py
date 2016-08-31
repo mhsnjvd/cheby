@@ -1,8 +1,293 @@
 import unittest
 import numpy as np
+from scipy import linalg
 from chebtech.chebtech import Chebtech
 
-if __name__ == "__main__":
+class TestChebtechMethods(unittest.TestCase):
+
+    def test_ctor(self):
+        f = Chebtech()
+        self.assertEqual(len(f), 0)
+        self.assertTrue(f is not None)
+        self.assertFalse(isinstance(f, list))
+
+        #% Get preferences:
+        #if ( nargin < 1 )
+        #    pref = chebtech.techPref();
+        #end
+        #% Set the tolerance:
+        #tol = 100 * np.spacing(1)
+        #
+        ## Initialize with default data:
+        #data = chebtech.parseDataInputs(struct());
+        #
+        #%%
+        #% Test on a scalar-valued function:
+        #pref.extrapolate = 0;
+        #pref.refinementFunction = 'nested';
+        #f = @(x) sin(x);
+        #g = populate(chebtech2, f, data, pref);
+        #x = chebtech2.chebpts(length(g.coeffs));
+        #values = g.coeffs2vals(g.coeffs);
+        #pass(1) = norm(f(x) - values, inf) < tol;
+        #pass(2) = abs(vscale(g) - sin(1)) < eps && g.ishappy && eps < tol;
+        #
+        #pref.extrapolate = 1;
+        #pref.refinementFunction = 'nested';
+        #g = populate(chebtech2, f, data, pref);
+        #x = chebtech2.chebpts(length(g.coeffs));
+        #values = g.coeffs2vals(g.coeffs);
+        #pass(3) = norm(f(x) - values, inf) < tol;
+        #pass(4) = norm(vscale(g) - sin(1), inf) < tol && logical(eps);
+        #
+        #pref.extrapolate = 0;
+        #pref.refinementFunction = 'resampling';
+        #g = populate(chebtech2, f, data, pref);
+        #x = chebtech2.chebpts(length(g.coeffs));
+        #values = g.coeffs2vals(g.coeffs);
+        #pass(5) = norm(f(x) - values, inf) < tol;
+        #pass(6) = abs(vscale(g) - sin(1)) < eps && logical(eps);
+        #
+        #pref.extrapolate = 1;
+        #pref.refinementFunction = 'resampling';
+        #g = populate(chebtech2, f, data, pref);
+        #x = chebtech2.chebpts(length(g.coeffs));
+        #values = g.coeffs2vals(g.coeffs);
+        #pass(7) = norm(f(x) - values, inf) < tol;
+        #pass(8) = norm(vscale(g) - sin(1), inf) < tol && logical(eps);
+        #
+        #%%
+        #% Test on an array-valued function:
+        #pref.extrapolate = 0;
+        #pref.refinementFunction = 'nested';
+        #f = @(x) [sin(x) cos(x) exp(x)];
+        #g = populate(chebtech2, f, data, pref);
+        #x = chebtech2.chebpts(length(g.coeffs));
+        #values = g.coeffs2vals(g.coeffs);
+        #pass(9) = norm(f(x) - values, inf) < tol;
+        #
+        #pref.extrapolate = 1;
+        #pref.refinementFunction = 'nested';
+        #g = populate(chebtech2, f, data, pref);
+        #x = chebtech2.chebpts(length(g.coeffs));
+        #values = g.coeffs2vals(g.coeffs);
+        #pass(10) = norm(f(x) - values, inf) < tol;
+        #
+        #pref.extrapolate = 0;
+        #pref.refinementFunction = 'resampling';
+        #g = populate(chebtech2, f, data, pref);
+        #x = chebtech2.chebpts(length(g.coeffs));
+        #values = g.coeffs2vals(g.coeffs);
+        #pass(11) = norm(f(x) - values, inf) < tol;
+        #
+        #pref.extrapolate = 1;
+        #pref.refinementFunction = 'resampling';
+        #g = populate(chebtech2, f, data, pref);
+        #x = chebtech2.chebpts(length(g.coeffs));
+        #values = g.coeffs2vals(g.coeffs);
+        #pass(12) = norm(f(x) - values, inf) < tol;
+        #
+        #%%
+        #% Some other tests:
+        #
+        #% This should fail with an error:
+        #try
+        #    f = @(x) x + NaN;
+        #    populate(chebtech2, f, data, pref);
+        #    pass(13) = false;
+        #catch ME
+        #    pass(13) = strcmp(ME.message, 'Too many NaNs/Infs to handle.');
+        #end
+        #
+        #% As should this:
+        #try
+        #    f = @(x) x + Inf;
+        #    populate(chebtech2, f, data, pref);
+        #    pass(14) = false;
+        #catch ME
+        #    pass(14) = strcmp(ME.message, 'Too many NaNs/Infs to handle.');
+        #end
+        #
+        #% Test that the extrapolation option avoids endpoint evaluations.
+        #pref.extrapolate = 1;
+        #try
+        #    populate(chebtech2, @(x) [F(x) F(x)], data, pref);
+        #    pass(15) = true;
+        #catch ME %#ok<NASGU>
+        #    pass(15) = false;
+        #end
+        #pref.extrapolate = 0;
+        #
+        #    function y = F(x)
+        #        if ( any(abs(x) == 1) )
+        #            error('Extrapolate should prevent endpoint evaluation.');
+        #        end
+        #        y = sin(x);
+        #    end
+        #
+        #% Check that things don't crash if pref.minSamples and pref.maxLength are equal.
+        #try
+        #    pref.minSamples = 8;
+        #    pref.maxLength = 8;
+        #    populate(chebtech2, @sin, data, pref);
+        #    pass(16) = true;
+        #catch
+        #    pass(16) = false;
+        #end
+        #
+        #%%
+        #% Test logical-valued functions:
+        #f = chebtech2(@(x) x > -2);
+        #g = chebtech2(1);
+        #pass(17) = normest(f - g) < eps;
+        #
+        #f = chebtech2(@(x) x < -2);
+        #g = chebtech2(0);
+        #pass(18) = normest(f - g) < eps;
+        #
+        #end
+        
+
+    def test_coeffs2vals(self):
+        tol = 100 * np.spacing(1)
+
+        # Test that a single value is converted correctly
+        c = np.array([np.sqrt(2)])
+        v = Chebtech.coeffs2vals(c)
+        self.assertEqual(v, c)
+
+        # Some simple data 
+        c = np.r_[1:6]
+        # Exact coefficients
+        vTrue = np.array([ 3, -4+np.sqrt(2), 3, -4-np.sqrt(2), 15])
+
+        # Test real branch
+        v = Chebtech.coeffs2vals(c)
+        self.assertTrue(linalg.norm(v - vTrue, np.inf) < tol)
+        self.assertFalse(np.any(v.imag))
+
+        # Test imaginary branch
+        v = Chebtech.coeffs2vals(1j*c);
+        self.assertTrue(linalg.norm(v - 1j*vTrue, np.inf) < tol)
+        self.assertFalse(np.any(v.real))
+
+        # Test general branch
+        v = Chebtech.coeffs2vals((1+1j)*c)
+        self.assertTrue(linalg.norm(v - (1+1j)*vTrue, np.inf) < tol)
+
+        # Test for symmetry preservation
+        c = np.array([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
+        v = Chebtech.coeffs2vals(c);
+        self.assertTrue(linalg.norm(v - np.flipud(v), np.inf) == 0.0)
+        c = np.array([0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
+        v = Chebtech.coeffs2vals(c);
+        self.assertTrue(linalg.norm(v + np.flipud(v), np.inf) == 0.0)
+
+    def test_vals2coeffs(self):
+        tol = 100 * np.spacing(1)
+
+        # Test that a single value is converted correctly
+        v = np.array([np.sqrt(2)])
+        c = Chebtech.vals2coeffs(v)
+        self.assertEqual(v, c)
+
+        # Some simple data 
+        v = np.r_[1:6]
+        # Exact coefficients
+        cTrue = np.array([ 3, 1 + 1/np.sqrt(2), 0, 1 - 1/np.sqrt(2), 0 ])
+
+        # Test real branch
+        c = Chebtech.vals2coeffs(v)
+        self.assertTrue(linalg.norm(c - cTrue, np.inf) < tol)
+        self.assertFalse(np.any(c.imag))
+
+        # Test imaginary branch
+        c = Chebtech.vals2coeffs(1j*v);
+        self.assertTrue(linalg.norm(c - 1j*cTrue, np.inf) < tol)
+        self.assertFalse(np.any(c.real))
+
+        # Test general branch
+        c = Chebtech.vals2coeffs((1+1j)*v)
+        self.assertTrue(linalg.norm(c - (1+1j)*cTrue, np.inf) < tol)
+
+        # Test for symmetry preservation
+        v = np.array([1.1, -2.2, 3.3, -2.2, 1.1])
+        c = Chebtech.vals2coeffs(v);
+        self.assertTrue(linalg.norm(c[1::2], np.inf) == 0.0)
+        v = np.array([1.1, -2.2, 0.0, 2.2, -1.1])
+        c = Chebtech.vals2coeffs(v);
+        self.assertTrue(linalg.norm(c[::2], np.inf) == 0.0)
+
+    def test_chebpts(self):
+        tol = 10 * np.spacing(1)
+        
+        # Test that n = 0 returns empty results:
+        x = Chebtech.chebpts(0)
+        self.assertEqual(x.size, 0)
+        
+        # Test n = 1:
+        x = Chebtech.chebpts(1)
+        self.assertEqual(len(x), 1)
+        self.assertEqual(x[0], 0.0)
+        
+        # Test that n = 2 returns [-1 , 1]:
+        x = Chebtech.chebpts(2);
+        self.assertEqual(len(x), 2)
+        self.assertTrue(np.all(x == np.array([-1.0, 1.0])))
+        
+        # Test that n = 3 returns [-1, 0, 1]:
+        x = Chebtech.chebpts(3);
+        self.assertEqual(len(x), 3)
+        self.assertTrue(np.all(x == np.array([-1.0, 0.0, 1.0])))
+        
+        # % Test that n = 129 returns vectors of the correct size:
+        n = 129;
+        x = Chebtech.chebpts(n);
+        self.assertEqual(len(x), n)
+        self.assertTrue(linalg.norm(x[0:int((n-1)/2)] + np.flipud(x[int((n+1)/2):]), np.inf) == 0.0 )
+        self.assertEqual(x[int((n-1)/2)], 0.0)
+
+    def test_alias(self):
+
+        tol = 100 * np.spacing(1)
+
+        # Testing a vector of coefficients.
+        c0 = np.r_[10.0:0.0:-1]
+
+        # Padding:
+        c1 = Chebtech.alias(c0, 11);
+        self.assertTrue(linalg.norm(np.r_[c0, 0.0] - c1, np.inf) == 0.0)
+
+        # Aliasing:
+        c2 = Chebtech.alias(c0, 9);
+        self.assertTrue(linalg.norm(np.r_[10.0:3.0:-1, 4.0, 2.0] - c2, np.inf) == 0.0)
+        c3 = Chebtech.alias(c0, 3);
+        self.assertTrue(linalg.norm(np.array([18.0, 25.0, 12.0]) - c3, np.inf) == 0.0)
+
+        # Compare against result of evaluating on a smaller grid:
+        v = Chebtech.clenshaw(Chebtech.chebpts(9), c0) 
+        self.assertTrue(linalg.norm(Chebtech.vals2coeffs(v) - c2, np.inf) < tol)
+
+        v = Chebtech.clenshaw(Chebtech.chebpts(3), c0) 
+        self.assertTrue(linalg.norm(Chebtech.vals2coeffs(v) - c3, np.inf) < tol)
+
+        # 
+        # Test aliasing a large tail.
+        c0 = 1/np.r_[1.0:1001.0]**5
+        n = 17;
+        c1 = Chebtech.alias(c0, n);
+        self.assertEqual(len(c1), n)
+        # This should give the same result as evaluating via clenshaw
+        v0 = Chebtech.coeffs2vals(c0);
+        v2 = Chebtech.clenshaw(Chebtech.chebpts(n), c0);
+        c2 = Chebtech.vals2coeffs(v2);
+        self.assertTrue(linalg.norm(c1 - c2, np.inf) < n*tol)
+
+
+if __name__ == '__main__':
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestChebtechMethods)
+    unittest.TextTestRunner(verbosity=2).run(suite)
+
     f = Chebtech(coeffs=[0, 0, 1])
     f.roots()
     print(f.coeffs)
@@ -27,27 +312,3 @@ if __name__ == "__main__":
 
     #r = roots(f)
     #print(r)
-
-
-class TestChebtechMethods(unittest.TestCase):
-
-    def test_ctor(self):
-        f = Chebtech()
-        self.assertEqual(len(f), 0)
-        self.assertTrue(f is not None)
-        self.assertFalse(fj
-
-    def test_coeffs2vals(self):
-        self.assertTrue('FOO'.isupper())
-        self.assertFalse('Foo'.isupper())
-
-    def test_vals2coeffs(self):
-        s = 'hello world'
-        self.assertEqual(s.split(), ['hello', 'world'])
-        # check that s.split fails when the separator is not a string
-        with self.assertRaises(TypeError):
-            s.split(2)
-
-if __name__ == '__main__':
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestChebtechMethods)
-    unittest.TextTestRunner(verbosity=2).run(suite)

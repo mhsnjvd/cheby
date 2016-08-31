@@ -19,6 +19,85 @@ def iszero_numerically(v, tol=None):
     else:
         return False
 
+
+def refine_resampling(op, values, pref):
+    #REFINERESAMPLING   Default refinement function for resampling scheme.
+
+    min_samples = 2**4 + 1
+    max_samples = 2**16 + 1 
+    extrapolate_flag = False
+
+
+    if values.size == 0:
+        # Choose initial n based upon min_samples:
+        n = 2 ** np.ceil(np.log2(min_samples - 1)) + 1
+    else:
+        # (Approximately) powers of sqrt(2):
+        power = np.log2(len(values) - 1)
+        if ( (power == np.floor(power)) and (power > 5) ):
+            n = np.round(2**(np.floor(power) + .5)) + 1
+            n = n - mod(n, 2) + 1
+        else:
+            n = 2**(np.floor(power) + 1) + 1
+    
+    # n is too large:
+    if ( n > max_samples ):
+        # Don't give up if we haven't sampled at least once.
+        if ( values.size == 0 ):
+            n = max_samples
+            give_up = False
+        else:
+            give_up = True
+            return
+    else:
+        give_up = False;
+   
+    # 2nd-kind Chebyshev grid:
+    x = Chebtech.chebpts(n);
+
+    # Evaluate the operator:
+    if ( extrapolate_flag ):
+        values = np.r_[np.nan, op(x[1:-1]), np.nan]
+    else:
+        values = op(x)
+    
+    return values, give_up
+
+function [values, give_up] = refineNested(op, values, pref)
+#REFINENESTED  Default refinement function for single ('nested') sampling.
+
+    if ( isempty(values) )
+        # The first time we are called, there are no values
+        # and REFINENESTED is the same as REFINERESAMPLING.
+        [values, give_up] = refineResampling(op, values, pref);
+
+    else
+    
+        # Compute new n by doubling (we must do this when not resampling).
+        n = 2*size(values, 1) - 1;
+        
+        # n is too large:
+        if ( n > pref.maxLength )
+            give_up = true;
+            return
+        else
+            give_up = false;
+        end
+        
+        # 2nd-kind Chebyshev grid:
+        x = chebtech2.chebpts(n);
+        # Take every 2nd entry:
+        x = x(2:2:end-1);
+
+        # Shift the stored values:
+        values(1:2:n,:) = values;
+        # Compute and insert new ones:
+        values(2:2:end-1,:) = feval(op, x);
+
+    end
+end
+
+
 class Chebtech:
     # Initialize properties of the object
     default_dtype = np.float64
@@ -135,19 +214,19 @@ class Chebtech:
         def rootsunit_coeffs(c, htol):
             """Compute the roots of the polynomial given by the coefficients c on the unit interval."""
        
-            # % Define these as persistent, need to compute only once.
+            # # Define these as persistent, need to compute only once.
             # persistent Tleft Tright
        
-            # % Simplify the coefficients:
+            # # Simplify the coefficients:
             tail_max = np.spacing(1) * np.abs(c).sum()
-            # % Find the final coefficient about tailMax:
+            # # Find the final coefficient about tailMax:
             big_coeffs_mask = np.nonzero(np.abs(c) > tail_max)[0]
             if len(big_coeffs_mask) == 0:
                 n = 0
             else:
                 n = big_coeffs_mask[-1] + 1
 
-            # % Truncate the coefficients (rather than alias):
+            # # Truncate the coefficients (rather than alias):
             if n > 1 and n < len(c):
                 c = c[:n]
        
@@ -209,12 +288,12 @@ class Chebtech:
                     rho_roots[rho_roots < 1] = 1.0/rho_roots[rho_roots < 1]
                     r = r[rho_roots <= rho]
             elif ( n <= 513 ):
-                #% If n <= 513 then we can compute the new coefficients with a
-                #% matrix-vector product.
+                ## If n <= 513 then we can compute the new coefficients with a
+                ## matrix-vector product.
                 # assemble the matrices TLEFT and TRIGHT
                 # [TODO] how to make Tleft persistent?
                 if ( True ):
-                    # % Create the coefficients for TLEFT using the FFT directly:
+                    # # Create the coefficients for TLEFT using the FFT directly:
                     x = chebptsAB(513, [-1, split_point]);
                     Tleft = np.ones((513, 513)); 
                     Tleft[:, 1] = x
@@ -227,7 +306,7 @@ class Chebtech:
                     Tleft[-1, :] = 0.5 * Tleft[0, :]
                     Tleft = np.triu(Tleft)
 
-                    # % Create the coefficients for TRIGHT much in the same way:
+                    # # Create the coefficients for TRIGHT much in the same way:
                     x = chebptsAB(513, [split_point, 1]);
                     Tright = np.ones((513, 513)); 
                     Tright[:, 1] = x;
@@ -270,13 +349,13 @@ class Chebtech:
 
                 
        
-            #% If n <= 513 then we can compute the new coefficients with a
-            #% matrix-vector product.
+            ## If n <= 513 then we can compute the new coefficients with a
+            ## matrix-vector product.
             #elseif ( n <= 513 )
             #    
-            #    % Have we assembled the matrices TLEFT and TRIGHT?
+            #    # Have we assembled the matrices TLEFT and TRIGHT?
             #    if ( isempty(Tleft) )
-            #        % Create the coefficients for TLEFT using the FFT directly:
+            #        # Create the coefficients for TLEFT using the FFT directly:
             #        x = chebptsAB(513, [-1, splitPoint]);
             #        Tleft = ones(513); 
             #        Tleft(:,2) = x;
@@ -287,7 +366,7 @@ class Chebtech:
             #        Tleft = real(fft(Tleft) / 512);
             #        Tleft = triu( [ 0.5*Tleft(1,:) ; Tleft(2:512,:) ; 0.5*Tleft(513,:) ] );
        
-            #        % Create the coefficients for TRIGHT much in the same way:
+            #        # Create the coefficients for TRIGHT much in the same way:
             #        x = chebptsAB(513, [splitPoint,1]);
             #        Tright = ones(513); 
             #        Tright(:,2) = x;
@@ -299,28 +378,28 @@ class Chebtech:
             #        Tright = triu( [ 0.5*Tright(1,:) ; Tright(2:512,:) ; 0.5*Tright(513,:) ] );
             #    end
        
-            #    % Compute the new coefficients:
+            #    # Compute the new coefficients:
             #    cleft = Tleft(1:n,1:n) * c;
             #    cright = Tright(1:n,1:n) * c;
        
-            #    % Recurse:
+            #    # Recurse:
             #    r = [ (splitPoint - 1)/2 + (splitPoint + 1)/2*rootsunit_coeffs(cleft, 2*htol) ;
             #          (splitPoint + 1)/2 + (1 - splitPoint)/2*rootsunit_coeffs(cright, 2*htol) ];
        
-            #% Otherwise, split using more traditional methods (i.e., Clenshaw):
+            ## Otherwise, split using more traditional methods (i.e., Clenshaw):
             #else
             #    
-            #    % Evaluate the polynomial on both intervals:
+            #    # Evaluate the polynomial on both intervals:
             #    v = chebtech.clenshaw([ chebptsAB(n, [ -1, splitPoint ]) ; ...
             #        chebptsAB(n, [ splitPoint, 1 ]) ], c);
        
-            #    % Get the coefficients on the left:
+            #    # Get the coefficients on the left:
             #    cleft = chebtech2.vals2coeffs(v(1:n));            
        
-            #    % Get the coefficients on the right:
+            #    # Get the coefficients on the right:
             #    cright = chebtech2.vals2coeffs(v(n+1:end));           
        
-            #    % Recurse:
+            #    # Recurse:
             #    r = [ (splitPoint - 1)/2 + (splitPoint + 1)/2*rootsunit_coeffs(cleft, 2*htol) ;
             #          (splitPoint + 1)/2 + (1 - splitPoint)/2*rootsunit_coeffs(cright, 2*htol) ];
        
@@ -332,7 +411,7 @@ class Chebtech:
             y = b*(x + 1)/2 + a*(1 - x)/2
             return y
     
-        # % Deal with empty case:
+        # # Deal with empty case:
         # if ( isempty(f) )
         #     out = [];
         #     return
@@ -403,36 +482,36 @@ class Chebtech:
 
     def cumsum(self):
         """Indefinite integral of a CHEBTECH.
-        %   CUMSUM(F) is the indefinite integral of the CHEBTECH F with the constant of
-        %   integration chosen so that F(-1) = 0.
-        %
-        %   CUMSUM(F, 2) will take cumulative sum over the columns of F which is an
-        %   array-valued CHEBTECH.
-        %
-        % See also DIFF, SUM.
+        #   CUMSUM(F) is the indefinite integral of the CHEBTECH F with the constant of
+        #   integration chosen so that F(-1) = 0.
+        #
+        #   CUMSUM(F, 2) will take cumulative sum over the columns of F which is an
+        #   array-valued CHEBTECH.
+        #
+        # See also DIFF, SUM.
         
-        % Copyright 2016 by The University of Oxford and The Chebfun Developers.
-        % See http://www.chebfun.org/ for Chebfun information.
+        # Copyright 2016 by The University of Oxford and The Chebfun Developers.
+        # See http://www.chebfun.org/ for Chebfun information.
         
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % If the CHEBTECH G of length n is represented as
-        %       \sum_{r=0}^{n-1} c_r T_r(x)
-        % its integral is represented with a CHEBTECH of length n+1 given by
-        %       \sum_{r=0}^{n} b_r T_r(x)
-        % where b_0 is determined from the constant of integration as
-        %       b_0 = \sum_{r=1}^{n} (-1)^(r+1) b_r;
-        % and other coefficients are given by
-        %       b_1 = c_0 - c_2/2,
-        %       b_r = (c_{r-1} - c_{r+1})/(2r) for r > 0,
-        % with c_{n+1} = c_{n+2} = 0.
-        %
-        % [Reference]: Pages 32-33 of Mason & Handscomb, "Chebyshev Polynomials".
-        % Chapman & Hall/CRC (2003).
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        ###########################################################################
+        # If the CHEBTECH G of length n is represented as
+        #       \sum_{r=0}^{n-1} c_r T_r(x)
+        # its integral is represented with a CHEBTECH of length n+1 given by
+        #       \sum_{r=0}^{n} b_r T_r(x)
+        # where b_0 is determined from the constant of integration as
+        #       b_0 = \sum_{r=1}^{n} (-1)^(r+1) b_r;
+        # and other coefficients are given by
+        #       b_1 = c_0 - c_2/2,
+        #       b_r = (c_{r-1} - c_{r+1})/(2r) for r > 0,
+        # with c_{n+1} = c_{n+2} = 0.
+        #
+        # [Reference]: Pages 32-33 of Mason & Handscomb, "Chebyshev Polynomials".
+        # Chapman & Hall/CRC (2003).
+        ###########################################################################
         """
 
-        # % Initialise storage:
-        # c = f.coeffs;                      % Obtain Chebyshev coefficients {c_r}
+        # # Initialise storage:
+        # c = f.coeffs;                      # Obtain Chebyshev coefficients {c_r}
         c = self.coeffs.copy()
 
         n = len(c)
@@ -440,31 +519,31 @@ class Chebtech:
         if n == 0:
             return Chebtech()
         
-        # c = [ c ; zeros(2, m) ;];          % Pad with zeros
+        # c = [ c ; zeros(2, m) ;];          # Pad with zeros
         c = np.r_[c, np.zeros(2)]
-        # b = zeros(n+1, m);                 % Initialize vector b = {b_r}
+        # b = zeros(n+1, m);                 # Initialize vector b = {b_r}
         b = np.zeros(n+1)
         
-        # % Compute b_(2) ... b_(n+1):
+        # # Compute b_(2) ... b_(n+1):
         # b(3:n+1,:) = (c(2:n,:) - c(4:n+2,:)) ./ repmat(2*(2:n).', 1, m);
         b[2:] = (c[1:n] - c[3:n+2])/(2*np.r_[2:n+1])
-        # b(2,:) = c(1,:) - c(3,:)/2;        % Compute b_1
+        # b(2,:) = c(1,:) - c(3,:)/2;        # Compute b_1
         b[1] = c[0] - c[2]/2
         # v = ones(1, n);
         v = np.ones(n)
         # v(2:2:end) = -1;
         v[1::2] = -1.0
-        # b(1,:) = v*b(2:end,:);             % Compute b_0 (satisfies f(-1) = 0)
+        # b(1,:) = v*b(2:end,:);             # Compute b_0 (satisfies f(-1) = 0)
         b[0] = np.dot(v, b[1:])
 
         return Chebtech(coeffs=b)
         
         
         # [TODO]
-        # % Simplify (as suggested in Chebfun ticket #128)
+        # # Simplify (as suggested in Chebfun ticket #128)
         # f = simplify(f);
         
-        # % Ensure f(-1) = 0:
+        # # Ensure f(-1) = 0:
         # lval = get(f, 'lval');
         # f.coeffs(1,:) = f.coeffs(1,:) - lval;
         
@@ -569,13 +648,13 @@ class Chebtech:
 
         # Trivial case of an empty CHEBTECH:
         if n == 0:
-            return self.copy()
+            return np.copy(self)
         
         if order == 0:
-            return self.copy()
+            return np.copy(self)
 
         # Get the coefficients:
-        c = self.coeffs.copy()
+        c = np.copy(self.coeffs)
         
         # If k >= n, we know the result will be the zero function:
         if ( order >= n ):
@@ -670,15 +749,17 @@ class Chebtech:
 
         return result
 
+    def __len__(self):
+        return self.length()
 
     def __str__(self):
         return "Chebtech object of length %s on [-1, 1]" % self.length()
+
     def __repr__(self):
         s = "Chebtech column (1 smooth piece)\n"
         s = s + "length = %s\n" % self.length()
         #return 'Chebtech object of length %s on [-1, 1]' % self.length()
         return s
-
 
 
     @staticmethod
@@ -739,17 +820,20 @@ class Chebtech:
         # These corrections are required because the MATLAB FFT does not
         # guarantee that these symmetries are enforced.
     
+        # Make sure everything is in floating point:
+        values = 1.0 * values
+
         # Get the length of the input:
         n = len(values)
     
         # Trivial case (constant):
         if n <= 1:
-            coeffs = values.copy()
+            coeffs = np.copy(values)
             return coeffs
-    
+
         # check for symmetry
-        # isEven = max(abs(values-flipud(values)),[],1) == 0;
-        # isOdd = max(abs(values+flipud(values)),[],1) == 0;
+        iseven = np.max(np.abs(values-np.flipud(values))) == 0.0
+        isodd = np.max(np.abs(values+np.flipud(values))) == 0.0
     
         # Mirror the values (to fake a DCT using an FFT):
         tmp = np.r_[values[n-1:0:-1], values[0:n-1]]
@@ -758,10 +842,10 @@ class Chebtech:
             # Real-valued case:
             coeffs = np.fft.ifft(tmp)
             coeffs = coeffs.real
-        elif np.isreal(1j*values).all():
+        elif np.isreal(1.0j*values).all():
             # Imaginary-valued case:
             coeffs = np.fft.ifft(tmp.imag)
-            coeffs = 1j*coeffs.real
+            coeffs = 1.0j*coeffs.real
         else:
             # General case:
             coeffs = np.fft.ifft(tmp)
@@ -770,12 +854,16 @@ class Chebtech:
         coeffs = coeffs[0:n]
     
         # Scale the interior coefficients:
-        coeffs[1:n-1] = 2*coeffs[1:n-1]
+        coeffs[1:n-1] = 2.0*coeffs[1:n-1]
+
     
         # adjust coefficients for symmetry
-        # [TODO]
-        # coeffs(2:2:end,isEven) = 0;
-        # coeffs(1:2:end,isOdd) = 0;
+        # [TODO] Is the np.fft already symmetric? in which 
+        # case we don't need this extra enforcing
+        if iseven:
+            coeffs[1::2] = 0.0
+        if isodd:
+            coeffs[::2] = 0.0
     
         return coeffs
     
@@ -813,21 +901,25 @@ class Chebtech:
         # These corrections are required because the MATLAB FFT does not
         # guarantee that these symmetries are enforced.
     
+        # Make sure everything is in floating point:
+        coeffs = 1.0 * coeffs
+
         # Get the length of the input:
         n = len(coeffs)
     
         # Trivial case (constant or empty):
         if n <= 1:
-            values = coeffs.copy()
+            values = np.copy(coeffs)
             return values
     
-        # check for symmetry
-        # isEven = max(abs(coeffs(2:2:end,:)),[],1) == 0;
-        # isOdd = max(abs(coeffs(1:2:end,:)),[],1) == 0;
     
+        # check for symmetry
+        iseven = np.max(np.abs(coeffs[1::2])) == 0.0
+        isodd = np.max(np.abs(coeffs[::2])) == 0.0
+
         # Scale the interior coefficients by 1/2:
-        temp = coeffs.copy()
-        temp[1:n-1] = temp[1:n-1]/2
+        temp = np.copy(coeffs)
+        temp[1:n-1] = temp[1:n-1]/2.0
     
         # Mirror the coefficients (to fake a DCT using an FFT):
         tmp = np.r_[temp , temp[n-2:0:-1]]
@@ -845,9 +937,14 @@ class Chebtech:
         # Flip and truncate:
         values = values[n-1::-1]
     
-        # [TODO]enforce symmetry
-        # values(:,isEven) = (values(:,isEven)+flipud(values(:,isEven)))/2;
-        # values(:,isOdd) = (values(:,isOdd)-flipud(values(:,isOdd)))/2;
+
+        # [TODO] Is the np.fft already symmetric? in which 
+        # case we don't need this extra enforcing
+        if iseven:
+            values = (values + np.flipud(values))/2.0
+        if isodd:
+            values = (values - np.flipud(values))/2.0
+
         return values
 
     @staticmethod
@@ -874,3 +971,74 @@ class Chebtech:
     
         y = c[0] + 0.5 * x * bk1 - bk2
         return y
+
+    @staticmethod
+    def alias(coeffs, m):
+        """
+        #ALIAS   Alias Chebyshev coefficients on the 2nd kind Chebyshev grid.
+        #   ALIAS(C, M) aliases the Chebyshev coefficients stored in the column vector C
+        #   to have length M. If M > LENGTH(C), the coefficients are padded with zeros.
+        #   If C is a matrix of coefficients, each of the columns is aliased to length
+        #   M.
+        #
+        # See also PROLONG.
+
+        # Copyright 2016 by The University of Oxford and The Chebfun Developers.
+        # See http://www.chebfun.org/ for Chebfun information.
+
+        ################################################################################
+        # Useful References:
+        #
+        #   L.N. Trefethen, Approximation Theory and Approximation Practice, SIAM, 2013
+        #   Page 27.
+        #
+        #   Fox, L. and Parker, I. B., Chebyshev polynomials in Numerical Analysis,
+        #   Oxford University Press, 1972.  (pp. 67)
+        #
+        #   Mason, J. C. and Handscomb, D. C., Chebyshev polynomials, Chapman &
+        #   Hall/CRC, Boca Raton, FL, 2003.  (pp. 153)
+        #
+        ################################################################################
+        """
+        # Make sure everything is floating point:
+        coeffs = 1.0 * coeffs
+
+        n = len(coeffs)
+
+        # Pad with zeros:
+        if m > n:
+            aliased_coeffs = np.r_[coeffs, np.zeros(m-n)]
+            return aliased_coeffs
+
+        # Alias coefficients: (see eq. (4.4) of Trefethen, Approximation Theory and
+        # Approximation Practice, SIAM, 2013):
+
+        aliased_coeffs = np.zeros(m)
+
+        if m == 0:
+            return aliased_coeffs
+
+        if m == 1:
+            # Reduce to a single point:
+            e = np.ones(n//2 + n%2)
+            e[1::2] = -1.0
+            aliased_coeffs = np.dot(e, coeffs[::2])
+            return aliased_coeffs
+
+
+        aliased_coeffs = np.copy(coeffs)
+        if m > n/2:
+            # If m > n/2, only single coefficients are aliased, and we can vectorise.
+            j = np.r_[m:n]
+            k = np.abs((j + m - 2)%(2*m-2) - m + 2)
+            aliased_coeffs[k] = aliased_coeffs[k] + aliased_coeffs[j];
+        else:
+            # Otherwise we must do everything in a tight loop. (Which is slower!)
+            for j in np.r_[m:n]:
+                k = np.abs((j + m - 2)%(2*m-2) - m + 2)
+                aliased_coeffs[k] = aliased_coeffs[k] + aliased_coeffs[j]
+
+        # Truncate:
+        aliased_coeffs = aliased_coeffs[:m]
+        
+        return aliased_coeffs
