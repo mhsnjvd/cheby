@@ -620,7 +620,7 @@ class Chebtech:
         #   CHEBTECH object.  COUT is the matrix of coefficients for a CHEBTECH object
         #   whose columns are the derivatives of those of the original.
             
-            c = coeffs.copy()
+            c = np.copy(coeffs)
 
             n = len(c)
             if n <= 1:
