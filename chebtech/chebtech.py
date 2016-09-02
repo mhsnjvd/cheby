@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import linalg
-#import bary
 import matplotlib.pyplot as plt
+import copy
 
 def iszero_numerically(v, tol=None):
     """
@@ -158,6 +158,13 @@ class Chebtech:
     def length(self):
         return len(self.coeffs)
 
+    def points(self):
+        n = self.length()
+        if n == 0:
+            return Chebtech.empty_array()
+        else:
+            return Chebtech.chebpts(n)
+
     def vscale(self):
         if self.length() == 0:
             return np.nan
@@ -176,16 +183,62 @@ class Chebtech:
         plt.show()
 
     def isreal(self):
-        if iszero_numerically.iszero_numerically(self.values.imag):
+        if iszero_numerically(self.values.imag):
             return True
         else:
             return False
 
     def isimag(self):
-        if iszero_numerically.iszero_numerically(self.values.real):
+        if iszero_numerically(self.values.real):
             return True
         else:
             return False
+
+    def isequal(self, other):
+        if not isinstance(other, Chebtech):
+            # [TODO] something must be done
+            print('isequal() accepts a Chebtech object only.')
+        
+        # Get coefficients and trim zeros at the end
+        a = np.trim_zeros(self.coeffs, 'b')
+        b = np.trim_zeros(self.coeffs, 'b')
+            
+        # compare coefficients
+        if len(a) != len(b):
+            return False
+        elif np.all(a==b):
+            return True
+        else:
+            return False
+
+    def __eq__(self, other):
+        return self.isequal(other)
+
+    def real(self):
+        """Real part of a CHEBTECH."""
+
+        # Compute the real part of the coefficients:
+        c = self.coeffs.real
+
+        if not np.any(c):
+            # [TODO] we need a tolerance here on c?
+            # Input was purely imaginary, so output a zero CHEBTECH:
+            return Chebtech(coeffs=[0.0])
+        else:
+            return Chebtech(coeffs=c)
+
+    def imag(self):
+        """Imaginary part of a Chebtech."""
+
+        # Compute the imaginary part of the coefficients:
+        c = self.coeffs.imag
+
+        if not np.any(c):
+            # [TODO] we need a tolerance here on c?
+            # Input was purely real, so output a zero CHEBTECH:
+            return Chebtech(coeffs=[0.0])
+        else:
+            return Chebtech(coeffs=c)
 
     def abs(self):
         #ABS   Absolute value of a CHEBTECH object.
@@ -667,7 +720,115 @@ class Chebtech:
 
         # Return a Chebtech made of the new coefficients:
         return Chebtech(coeffs=c)
-            
+
+
+    def minandmax(self):
+        """Global minimum and maximum on [-1,1].
+        #   VALS = MINANDMAX(F) returns a 2-vector VALS = [MIN(F); MAX(F)] with the
+        #   global minimum and maximum of the CHEBTECH F on [-1,1].  If F is a
+        #   array-valued CHEBTECH, VALS is a 2-by-N matrix, where N is the number of
+        #   columns of F.  VALS(1, K) is the global minimum of the Kth column of F on
+        #   [-1, 1], and VALS(2, K) is the global maximum of the same.
+        #
+        #   [VALS, POS] = MINANDMAX(F) returns also the 2-vector POS where the minimum
+        #   and maximum of F occur.
+        #
+        #   If F is complex-valued the absolute values are taken to determine extrema
+        #   but the resulting values correspond to those of the original function. That
+        #   is, VALS = FEVAL(F, POS) where [~, POS] = MINANDMAX(ABS(F)). (In fact,
+        #   MINANDMAX actually computes [~, POS] = MINANDMAX(ABS(F).^2), to avoid
+        #   introducing singularities to the function).
+        #
+        # See also MIN, MAX.
+    
+        # Copyright 2016 by The University of Oxford and The Chebfun Developers.
+        # See http://www.chebfun.org/ for Chebfun information.
+        """
+    
+        if not self.isreal():
+            # We compute sqrt(max(|f|^2))to avoid introducing a singularity.
+            realf = self.real()
+            imagf = self.imag()
+            h = realf*realf + imagf*imagf
+            h = h.simplify()
+            ignored, pos = h.minandmax()
+            vals = self[pos]
+            return vals, pos
+    
+        # Compute derivative:
+        fp = self.diff()
+    
+        # Make the Chebyshev grid (used in minandmaxColumn).
+        xpts = self.points()
+    
+    
+        # Initialise output
+        pos = Chebtech.zero_array(2)
+        vals = Chebtech.zero_array(2)
+        
+        if self.length() == 1:
+            vals = self[pos]
+            return vals, pos
+        
+        # Compute critical points:
+        r = fp.roots()
+        r = np.unique(np.r_[-1.0, r, 1.0])
+        v = self[r]
+    
+        # min
+        vals[0] = np.min(v)
+        pos[0] = r[np.argmin(v)]
+    
+        # Take the minimum of the computed minimum and the function values:
+        values = self.coeffs2vals(self.coeffs);
+        temp = np.r_[vals[0], values]
+        vmin = np.min(temp)
+        vindex = np.argmin(temp)
+        if vmin < vals[0]:
+            vals[0] = vmin;
+            pos[0] = xpts[vindex - 1]
+    
+        # max
+        vals[1] = np.max(v)
+        pos[1] = r[np.argmax(v)]
+    
+        # Take the maximum of the computed maximum and the function values:
+        temp = np.r_[vals[1], values]
+        vmax = np.max(temp)
+        vindex = np.argmax(temp)
+        if vmax > vals[1]:
+            vals[1] = vmax
+            pos[1] = xpts[vindex - 1]
+    
+        return vals, pos
+
+    def max(self):
+        """Global maximum of a CHEBTECH on [-1,1]."""
+
+        minmax, pos = self.minandmax()
+        return minmax[1]
+
+    def argmax(self):
+        """Location of global maximum of a CHEBTECH on [-1,1]."""
+
+        minmax, pos = self.minandmax()
+        return pos[1]
+
+    def min(self):
+        """Global minimum of a CHEBTECH on [-1,1]."""
+
+        minmax, pos = self.minandmax()
+        return minmax[0]
+
+    def argmin(self):
+        """Location of global minimum of a CHEBTECH on [-1,1]."""
+
+        minmax, pos = self.minandmax()
+        return pos[0]
+
+    def simplify(self):
+        return copy.deepcopy(self)
+                
 
     def __add__(self, other):
         if not isinstance(other, Chebtech):
@@ -974,13 +1135,13 @@ class Chebtech:
 
     @staticmethod
     def alias(coeffs, m):
-        """
-        #ALIAS   Alias Chebyshev coefficients on the 2nd kind Chebyshev grid.
-        #   ALIAS(C, M) aliases the Chebyshev coefficients stored in the column vector C
-        #   to have length M. If M > LENGTH(C), the coefficients are padded with zeros.
-        #   If C is a matrix of coefficients, each of the columns is aliased to length
-        #   M.
-        #
+        """Alias Chebyshev coefficients on the 2nd kind Chebyshev grid.
+
+        ALIAS(C, M) aliases the Chebyshev coefficients stored in the column vector C
+        to have length M. If M > LENGTH(C), the coefficients are padded with zeros.
+        If C is a matrix of coefficients, each of the columns is aliased to length
+        M.
+        
         # See also PROLONG.
 
         # Copyright 2016 by The University of Oxford and The Chebfun Developers.
@@ -1007,13 +1168,13 @@ class Chebtech:
 
         # Pad with zeros:
         if m > n:
-            aliased_coeffs = np.r_[coeffs, np.zeros(m-n)]
+            aliased_coeffs = np.r_[coeffs, Chebtech.zero_array(m-n)]
             return aliased_coeffs
 
         # Alias coefficients: (see eq. (4.4) of Trefethen, Approximation Theory and
         # Approximation Practice, SIAM, 2013):
 
-        aliased_coeffs = np.zeros(m)
+        aliased_coeffs = Chebtech.zero_array(m)
 
         if m == 0:
             return aliased_coeffs
