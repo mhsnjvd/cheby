@@ -767,8 +767,8 @@ class Chebtech:
         return np.array([], dtype=Chebtech.default_dtype)
 
     @staticmethod
-    def zero_array():
-        return np.array([0.0], dtype=Chebtech.default_dtype)
+    def zero_array(n=1):
+        return np.zeros(n, dtype=Chebtech.default_dtype)
 
     @staticmethod
     def chebpts(n):
