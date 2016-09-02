@@ -288,29 +288,30 @@ class TestChebtechMethods(unittest.TestCase):
 
         func = lambda x: (x+1)*50;
         f = Chebtech(lambda x: special.j0(func(x)))
-        r = map(roots(f));
-        exact = [   2.40482555769577276862163; 5.52007811028631064959660
-                    8.65372791291101221695437; 11.7915344390142816137431
-                    14.9309177084877859477626; 18.0710639679109225431479
-                    21.2116366298792589590784; 24.3524715307493027370579
-                    27.4934791320402547958773; 30.6346064684319751175496
-                    33.7758202135735686842385; 36.9170983536640439797695
-                    40.0584257646282392947993; 43.1997917131767303575241
-                    46.3411883716618140186858; 49.4826098973978171736028
-                    52.6240518411149960292513; 55.7655107550199793116835
-                    58.9069839260809421328344; 62.0484691902271698828525
-                    65.1899648002068604406360; 68.3314693298567982709923
-                    71.4729816035937328250631; 74.6145006437018378838205
-                    77.7560256303880550377394; 80.8975558711376278637723
-                    84.0390907769381901578795; 87.1806298436411536512617
-                    90.3221726372104800557177; 93.4637187819447741711905
-                    96.6052679509962687781216; 99.7468198586805964702799 ];
+        r = func(roots(f));
+        exact = np.array([\
+            2.40482555769577276862163, 5.52007811028631064959660, \
+            8.65372791291101221695437, 11.7915344390142816137431, \
+            14.9309177084877859477626, 18.0710639679109225431479, \
+            21.2116366298792589590784, 24.3524715307493027370579, \
+            27.4934791320402547958773, 30.6346064684319751175496, \
+            33.7758202135735686842385, 36.9170983536640439797695, \
+            40.0584257646282392947993, 43.1997917131767303575241, \
+            46.3411883716618140186858, 49.4826098973978171736028, \
+            52.6240518411149960292513, 55.7655107550199793116835, \
+            58.9069839260809421328344, 62.0484691902271698828525, \
+            65.1899648002068604406360, 68.3314693298567982709923, \
+            71.4729816035937328250631, 74.6145006437018378838205, \
+            77.7560256303880550377394, 80.8975558711376278637723, \
+            84.0390907769381901578795, 87.1806298436411536512617, \
+            90.3221726372104800557177, 93.4637187819447741711905, \
+            96.6052679509962687781216, 99.7468198586805964702799])
 
         self.assertTrue(linalg.norm(r-exact, np.inf) < 1e1 * len(f) * np.spacing(1))
          
 
         k = 500;
-        f = Chebtech(fun=lambda x: sin(np.pi*k*x))
+        f = Chebtech(fun=lambda x: np.sin(np.pi*k*x))
         r = f.roots()
         self.assertTrue(linalg.norm(r-(1.0*np.r_[-k:k+1])/k, np.inf) < 1e1 * len(f) * np.spacing(1))
 
@@ -322,45 +323,49 @@ class TestChebtechMethods(unittest.TestCase):
         
         
         # Test a some simple polynomials:
-        f = testclass.make([-1 ; 1], [], pref);
-        r = f.roots()
-        pass(n, 4) = all( r == 0 );
+        # f = testclass.make([-1 ; 1], [], pref);
+        # r = f.roots()
+        # pass(n, 4) = all( r == 0 );
 
-        f = testclass.make([1 ; 0 ; 1]);
-        r = f.roots()
-        pass(n, 5) = numel(r) == 2 && (norm(r, inf) < eps);
+        # f = testclass.make([1 ; 0 ; 1]);
+        # r = f.roots()
+        # pass(n, 5) = numel(r) == 2 && (norm(r, inf) < eps);
 
         # Test some complex roots:
-        f = Chebtech(fun=lambda x: 1 + 25*x**2)
-        r = f.roots(complex=True)
-        self.assertTrue(linalg.norm( r - [1.0j ; -1.0j]/5.0, np.inf) < 10*np.spacing(1))
+        # f = Chebtech(fun=lambda x: 1 + 25*x**2)
+        # r = f.roots(complex=True)
+        # self.assertTrue(linalg.norm( r - [1.0j ; -1.0j]/5.0, np.inf) < 10*np.spacing(1))
             
-        f = Chebtech(fun=lambda x: (1 + 25*x**2)*np.exp(x))
-        r = f.roots(complex=True, prune=True)
-        self.assertTrue(linalg.norm( r - [1.0j ; -1.0j]/5.0, np.inf) < 10*len(f)*np.spacing(1))
+        # f = Chebtech(fun=lambda x: (1 + 25*x**2)*np.exp(x))
+        # r = f.roots(complex=True, prune=True)
+        # self.assertTrue(linalg.norm( r - [1.0j ; -1.0j]/5.0, np.inf) < 10*len(f)*np.spacing(1))
 
-        f = testclass.make(@(x) sin(100*pi*x));
-        r1 = f.roots(complex=True, recurse=False);
-        r2 = f.roots(complex=True);
+        # f = testclass.make(@(x) sin(100*pi*x));
+        # r1 = f.roots(complex=True, recurse=False);
+        # r2 = f.roots(complex=True);
 
-        self.assertEqual(len(r1), 201)
-        self.assertEqual(len(r2), 213)
+        # self.assertEqual(len(r1), 201)
+        # self.assertEqual(len(r2), 213)
 
         # Adding test for 'qz' flag: 
-        f = Chebtech(fun=lambda x: 1e-10*x**3 + x**2 - 1e-12)
-        r = f.roots(qz=True)
-        self.assertFalse(len(r)==0)
-        self.assertTrue(linalg.norm(f[r], np.inf) < 10*np.spacing(1))
+        # f = Chebtech(fun=lambda x: 1e-10*x**3 + x**2 - 1e-12)
+        # r = f.roots(qz=True)
+        # self.assertFalse(len(r)==0)
+        # self.assertTrue(linalg.norm(f[r], np.inf) < 10*np.spacing(1))
 
             
         
         # Add a rootfinding test for low degree non-even functions: 
-        f = Chebtech(fun=lambda x: (x-.5)*(x-1/3))
-        r = f.roots(qz=True)
-        self.assertTrue(linalg.norm(f[r], np.inf) < np.spacing(1))
+        # f = Chebtech(fun=lambda x: (x-.5)*(x-1/3))
+        # r = f.roots(qz=True)
+        # self.assertTrue(linalg.norm(f[r], np.inf) < np.spacing(1))
 
 
 if __name__ == '__main__':
+    k = 500;
+    f = Chebtech(fun=lambda x: np.sin(np.pi*k*x))
+    r = f.roots()
+   
     suite = unittest.TestLoader().loadTestsFromTestCase(TestChebtechMethods)
     unittest.TextTestRunner(verbosity=2).run(suite)
 
