@@ -100,7 +100,8 @@ def refine_by_nesting(op, values):
 
 class Chebtech:
     # Initialize properties of the object
-    default_dtype = np.float64
+    #default_dtype = np.float64
+    default_dtype = np.complex128
     
     def __init__(self, fun=None, **kwargs):
         self.coeffs = np.array([], dtype=type(self).default_dtype)
@@ -140,8 +141,8 @@ class Chebtech:
                 # Trim zeros from the back
                 coeffs_mask = np.nonzero(np.abs(coeffs) > tol)[0]
                 if len(coeffs_mask) == 0:
-                    self.coeffs = Chebtech.zero_array()
-                    self.values = Chebtech.zero_array()
+                    self.coeffs = Chebtech.zeros(1)
+                    self.values = Chebtech.zeros(1)
                     return
                 else:
                     n = coeffs_mask[-1] + 1
@@ -171,11 +172,6 @@ class Chebtech:
         else:
             return np.abs(self.values).max()
 
-    def __getitem__(self, x):
-        # Evaluate the object at the point(s) x:
-        # fx = bary.bary(x, self.values)
-        fx = Chebtech.clenshaw(x, self.coeffs)
-        return fx
 
     def plot(self):
         x = np.linspace(-1, 1, 2001)
@@ -264,13 +260,13 @@ class Chebtech:
         """Roots of a CHEBTECH in the interval [-1,1].
         """
 
-        def rootsunit_coeffs(c, htol):
+        def roots_main(c, htol):
             """Compute the roots of the polynomial given by the coefficients c on the unit interval."""
        
             # # Define these as persistent, need to compute only once.
             # persistent Tleft Tright
        
-            # # Simplify the coefficients:
+            # Simplify the coefficients:
             tail_max = np.spacing(1) * np.abs(c).sum()
             # # Find the final coefficient about tailMax:
             big_coeffs_mask = np.nonzero(np.abs(c) > tail_max)[0]
@@ -283,16 +279,16 @@ class Chebtech:
             if n > 1 and n < len(c):
                 c = c[:n]
        
-            max_eig_size = 50
+            max_eig_size = np.inf #50
 
             if n == 0:
                 if roots_pref['zero_fun']:
-                    r = Chebtech.zero_array()
+                    r = Chebtech.zeros(1)
                 else:
                     r = Chebtech.empty_array()
             elif n == 1:
                 if c[0] == 0.0 and roots_pref['zero_fun']:
-                    r = Chebtech.zero_array()
+                    r = Chebtech.zeros(1)
                 else:
                     r = Chebtech.empty_array()
             elif n == 2:
@@ -303,18 +299,18 @@ class Chebtech:
                     else:
                         r = np.min([r.real, 1])
                         r = np.max([r, -1])
-            elif roots_pref['recurse'] and n <= max_eig_size:
-                c_old = c.copy()
+            elif not roots_pref['recurse'] or n <= max_eig_size:
+                c_old = np.copy(c)
                 c = -0.5 * c[:-1]/c[-1]
                 c[-2] = c[-2] + 0.5
 
-                oh = 0.5 * np.ones(len(c)-1)
+                oh = 0.5 * Chebtech.ones(len(c)-1)
                 A = np.diag(oh, 1) + np.diag(oh, -1)
                 A[-2, -1] = 1.0
                 A[:, 0] = np.flipud(c)
 
                 if roots_pref['qz']: 
-                    B = np.eye(A.shape)
+                    B = Chebtech.eye(A.shape[0], A.shape[1])
                     c_old = c_old / np.abs(c_old).max()
                     B[0, 0] = c_old[-1]
                     c_old = -0.5 * c_old[:-1]
@@ -340,51 +336,55 @@ class Chebtech:
                     rho_roots = np.abs(r + np.sqrt(r**2 - 1))
                     rho_roots[rho_roots < 1] = 1.0/rho_roots[rho_roots < 1]
                     r = r[rho_roots <= rho]
-            elif ( n <= 513 ):
-                ## If n <= 513 then we can compute the new coefficients with a
-                ## matrix-vector product.
-                # assemble the matrices TLEFT and TRIGHT
-                # [TODO] how to make Tleft persistent?
-                if ( True ):
-                    # # Create the coefficients for TLEFT using the FFT directly:
-                    x = chebptsAB(513, [-1, split_point]);
-                    Tleft = np.ones((513, 513)); 
-                    Tleft[:, 1] = x
-                    for k in range(2, 513):
-                        Tleft[:, k] = 2 * x * Tleft[:, k-1] - Tleft[:, k-2]
+            #elif ( n <= 513 ):
+            #    ## If n <= 513 then we can compute the new coefficients with a
+            #    ## matrix-vector product.
+            #    # assemble the matrices TLEFT and TRIGHT
+            #    # [TODO] how to make Tleft persistent?
+            #    #if ( True ):
+            #    # # Create the coefficients for TLEFT using the FFT directly:
+            #    x = chebptsAB(513, [-1, split_point]);
+            #    Tleft = Chebtech.ones((513, 513)); 
+            #    Tleft[:, 1] = x
+            #    for k in range(2, 513):
+            #        Tleft[:, k] = 2 * x * Tleft[:, k-1] - Tleft[:, k-2]
 
-                    Tleft = np.r_[Tleft[-1:0:-1, :], Tleft[:-1, :]]
-                    Tleft = np.fft.fft(Tleft).real / 512.0
-                    Tleft[0, :] = 0.5 * Tleft[0, :]
-                    Tleft[-1, :] = 0.5 * Tleft[0, :]
-                    Tleft = np.triu(Tleft)
+            #    Tleft = np.r_[Tleft[-1:0:-1, :], Tleft[:-1, :]]
+            #    Tleft = np.fft.fft(Tleft).real / 512.0
+            #    Tleft[0, :] = 0.5 * Tleft[0, :]
+            #    Tleft[-1, :] = 0.5 * Tleft[0, :]
+            #    Tleft = np.triu(Tleft)
 
-                    # # Create the coefficients for TRIGHT much in the same way:
-                    x = chebptsAB(513, [split_point, 1]);
-                    Tright = np.ones((513, 513)); 
-                    Tright[:, 1] = x;
-                    for k in range(2, 513):
-                        Tright[:, k] = 2 * x * Tright[:, k-1] - Tright[:, k-2]; 
+            #    # # Create the coefficients for TRIGHT much in the same way:
+            #    x = chebptsAB(513, [split_point, 1]);
+            #    Tright = Chebtech.ones((513, 513)); 
+            #    Tright[:, 1] = x;
+            #    for k in range(2, 513):
+            #        Tright[:, k] = 2 * x * Tright[:, k-1] - Tright[:, k-2]; 
 
-                    Tright = np.r_[ Tright[-1:0:-1, :], Tright[:-1, :]]
-                    Tright = np.fft.fft(Tright).real / 512.0
-                    Tright[0, :] = 0.5 * Tright[0, :]
-                    Tright[-1, :] = 0.5 * Tright[-1, :]
-                    Tright = np.triu(Tright)
+            #    Tright = np.r_[Tright[-1:0:-1, :], Tright[:-1, :]]
+            #    Tright = np.fft.fft(Tright).real / 512.0
+            #    Tright[0, :] = 0.5 * Tright[0, :]
+            #    Tright[-1, :] = 0.5 * Tright[-1, :]
+            #    Tright = np.triu(Tright)
        
-                # Compute the new coefficients:
-                c_left = np.dot(Tleft[:n, :n], c)
-                c_right = np.dot(Tright[:n, :n], c)
+            #    # Compute the new coefficients:
+            #    c_left = np.dot(Tleft[:n, :n], c)
+            #    c_right = np.dot(Tright[:n, :n], c)
        
-                # Recurse:
-                r = np.r_[ (split_point - 1.0)/2.0 + (split_point + 1.0)/2.0*rootsunit_coeffs(c_left, 2*htol), \
-                        (split_point + 1.0)/2.0 + (1.0 - split_point)/2.0*rootsunit_coeffs(c_right, 2*htol) ]
+            #    # Recurse:
+            #    r_left = roots_main(c_left, 2*htol)
+            #    r_right = roots_main(c_right, 2*htol)
+            #    r1 = (split_point - 1.0)/2.0 + (split_point + 1.0)/2.0 * r_left
+            #    r2 = (split_point + 1.0)/2.0 + (1.0 - split_point)/2.0 * r_right
+            #    r = np.r_[r1, r2]
        
             # Otherwise, split using more traditional methods (i.e., Clenshaw):
             else:
                 # Evaluate the polynomial on both intervals:
-                xx = np.r_[chebptsAB(n, [ -1, split_point]), \
-                    chebptsAB(n, [split_point, 1])]
+                x_left = chebptsAB(n, [ -1, split_point])
+                x_right = chebptsAB(n, [split_point, 1])
+                xx = np.r_[x_left, x_right]
                 v = Chebtech.clenshaw(xx, c);
        
                 # Get the coefficients on the left:
@@ -394,67 +394,14 @@ class Chebtech:
                 c_right = Chebtech.vals2coeffs(v[n:])
        
                 # Recurse:
-                r = np.r_[ (split_point - 1.0)/2.0 + (split_point + 1.0)/2.0*rootsunit_coeffs(c_left, 2*htol), \
-                        (split_point + 1.0)/2.0 + (1.0 - split_point)/2.0*rootsunit_coeffs(c_right, 2*htol) ]
+                r_left = roots_main(c_left, 2*htol)
+                r_right = roots_main(c_right, 2*htol)
+                r1 = (split_point - 1.0)/2.0 + (split_point + 1.0)/2.0 * r_left
+                r2 = (split_point + 1.0)/2.0 + (1.0 - split_point)/2.0 * r_right
+                r = np.r_[r1, r2]
 
             return np.r_[r]
 
-
-                
-       
-            ## If n <= 513 then we can compute the new coefficients with a
-            ## matrix-vector product.
-            #elseif ( n <= 513 )
-            #    
-            #    # Have we assembled the matrices TLEFT and TRIGHT?
-            #    if ( isempty(Tleft) )
-            #        # Create the coefficients for TLEFT using the FFT directly:
-            #        x = chebptsAB(513, [-1, splitPoint]);
-            #        Tleft = ones(513); 
-            #        Tleft(:,2) = x;
-            #        for k = 3:513
-            #            Tleft(:,k) = 2 * x .* Tleft(:,k-1) - Tleft(:,k-2); 
-            #        end
-            #        Tleft = [ Tleft(513:-1:2,:) ; Tleft(1:512,:) ];
-            #        Tleft = real(fft(Tleft) / 512);
-            #        Tleft = triu( [ 0.5*Tleft(1,:) ; Tleft(2:512,:) ; 0.5*Tleft(513,:) ] );
-       
-            #        # Create the coefficients for TRIGHT much in the same way:
-            #        x = chebptsAB(513, [splitPoint,1]);
-            #        Tright = ones(513); 
-            #        Tright(:,2) = x;
-            #        for k = 3:513
-            #            Tright(:,k) = 2 * x .* Tright(:,k-1) - Tright(:,k-2); 
-            #        end
-            #        Tright = [ Tright(513:-1:2,:) ; Tright(1:512,:) ];
-            #        Tright = real(fft(Tright) / 512);
-            #        Tright = triu( [ 0.5*Tright(1,:) ; Tright(2:512,:) ; 0.5*Tright(513,:) ] );
-            #    end
-       
-            #    # Compute the new coefficients:
-            #    cleft = Tleft(1:n,1:n) * c;
-            #    cright = Tright(1:n,1:n) * c;
-       
-            #    # Recurse:
-            #    r = [ (splitPoint - 1)/2 + (splitPoint + 1)/2*rootsunit_coeffs(cleft, 2*htol) ;
-            #          (splitPoint + 1)/2 + (1 - splitPoint)/2*rootsunit_coeffs(cright, 2*htol) ];
-       
-            ## Otherwise, split using more traditional methods (i.e., Clenshaw):
-            #else
-            #    
-            #    # Evaluate the polynomial on both intervals:
-            #    v = chebtech.clenshaw([ chebptsAB(n, [ -1, splitPoint ]) ; ...
-            #        chebptsAB(n, [ splitPoint, 1 ]) ], c);
-       
-            #    # Get the coefficients on the left:
-            #    cleft = chebtech2.vals2coeffs(v(1:n));            
-       
-            #    # Get the coefficients on the right:
-            #    cright = chebtech2.vals2coeffs(v(n+1:end));           
-       
-            #    # Recurse:
-            #    r = [ (splitPoint - 1)/2 + (splitPoint + 1)/2*rootsunit_coeffs(cleft, 2*htol) ;
-            #          (splitPoint + 1)/2 + (1 - splitPoint)/2*rootsunit_coeffs(cright, 2*htol) ];
        
         def chebptsAB(n, ab):
             """chebpts in an interval."""
@@ -482,8 +429,8 @@ class Chebtech:
         roots_pref['qz'] = kwargs.setdefault('qz', False)
         roots_pref['filter'] = kwargs.setdefault('filter', None)
 
-        if 'complex' in kwargs.keys():
-            roots_pref['complex'] = True
+        if 'complex_roots' in kwargs.keys():
+            roots_pref['complex_roots'] = True
             roots_pref['all'] = True
             roots_pref['prune'] = True
 
@@ -496,7 +443,7 @@ class Chebtech:
         if self.length() == 1:
             if self.coeffs[0] == 0.0 and roots_pref['zero_fun']:
                 # Return a root at centre of domain:
-                out = Chebtech.zero_array()
+                out = Chebtech.zeros(1)
             else:
                 # Return empty:
                 out = Chebtech.empty_array()
@@ -508,7 +455,7 @@ class Chebtech:
         # Call the recursive rootsunit function:
         # TODO:  Does the tolerance need to depend on some notion of hscale?
         default_tol = np.spacing(1)*100
-        r = rootsunit_coeffs(c, default_tol)
+        r = roots_main(c, default_tol)
 
         # Try to filter out spurious roots:
         if roots_pref['filter'] is not None:
@@ -573,9 +520,9 @@ class Chebtech:
             return Chebtech()
         
         # c = [ c ; zeros(2, m) ;];          # Pad with zeros
-        c = np.r_[c, np.zeros(2)]
+        c = np.r_[c, Chebtech.zeros(2)]
         # b = zeros(n+1, m);                 # Initialize vector b = {b_r}
-        b = np.zeros(n+1)
+        b = Chebtech.zeros(n+1)
         
         # # Compute b_(2) ... b_(n+1):
         # b(3:n+1,:) = (c(2:n,:) - c(4:n+2,:)) ./ repmat(2*(2:n).', 1, m);
@@ -583,7 +530,7 @@ class Chebtech:
         # b(2,:) = c(1,:) - c(3,:)/2;        # Compute b_1
         b[1] = c[0] - c[2]/2
         # v = ones(1, n);
-        v = np.ones(n)
+        v = Chebtech.ones(n)
         # v(2:2:end) = -1;
         v[1::2] = -1.0
         # b(1,:) = v*b(2:end,:);             # Compute b_0 (satisfies f(-1) = 0)
@@ -677,10 +624,10 @@ class Chebtech:
 
             n = len(c)
             if n <= 1:
-                return Chebtech.zero_array()
+                return Chebtech.zeros(1)
 
 
-            cout = np.zeros(n-1)
+            cout = Chebtech.zeros(n-1)
             #w = repmat(2*(1:n-1)', 1, m);
             w = 2*np.r_[1:n]
             #v = w.*c(2:end,:);                           # Temporal vector
@@ -763,8 +710,8 @@ class Chebtech:
     
     
         # Initialise output
-        pos = Chebtech.zero_array(2)
-        vals = Chebtech.zero_array(2)
+        pos = Chebtech.zeros(2)
+        vals = Chebtech.zeros(2)
         
         if self.length() == 1:
             vals = self[pos]
@@ -838,10 +785,10 @@ class Chebtech:
         n = self.length()
         m = other.length()
         if n >= m:
-            coeffs = np.r_[other.coeffs, np.zeros(n-m)]
+            coeffs = np.r_[other.coeffs, Chebtech.zeros(n-m)]
             result.coeffs = self.coeffs + coeffs
         else:
-            coeffs = np.r_[self.coeffs, np.zeros(m-n)]
+            coeffs = np.r_[self.coeffs, Chebtech.zeros(m-n)]
             result.coeffs = other.coeffs + coeffs
 
         result.values = Chebtech.coeffs2vals(result.coeffs)
@@ -857,10 +804,10 @@ class Chebtech:
         n = self.length()
         m = other.length()
         if n >= m:
-            coeffs = np.r_[other.coeffs, np.zeros(n-m)]
+            coeffs = np.r_[other.coeffs, Chebtech.zeros(n-m)]
             result.coeffs = self.coeffs - coeffs
         else:
-            coeffs = np.r_[self.coeffs, np.zeros(m-n)]
+            coeffs = np.r_[self.coeffs, Chebtech.zeros(m-n)]
             result.coeffs = other.coeffs - coeffs
 
         result.values = Chebtech.coeffs2vals(result.coeffs)
@@ -889,10 +836,10 @@ class Chebtech:
         n = self.length()
         m = other.length()
         if n >= m:
-            coeffs = np.r_[other.coeffs, np.zeros(n-m)]
+            coeffs = np.r_[other.coeffs, Chebtech.zeros(n-m)]
             result.coeffs = self.coeffs - coeffs
         else:
-            coeffs = np.r_[self.coeffs, np.zeros(m-n)]
+            coeffs = np.r_[self.coeffs, Chebtech.zeros(m-n)]
             result.coeffs = other.coeffs - coeffs
 
         result.values = Chebtech.coeffs2vals(result.coeffs)
@@ -921,15 +868,30 @@ class Chebtech:
         s = s + "length = %s\n" % self.length()
         #return 'Chebtech object of length %s on [-1, 1]' % self.length()
         return s
+    def __call__(self, x):
+        return self[x]
 
+    def __getitem__(self, x):
+        # Evaluate the object at the point(s) x:
+        # fx = bary.bary(x, self.values)
+        fx = Chebtech.clenshaw(x, self.coeffs)
+        return fx
 
     @staticmethod
     def empty_array():
         return np.array([], dtype=Chebtech.default_dtype)
 
     @staticmethod
-    def zero_array(n=1):
+    def zeros(n):
         return np.zeros(n, dtype=Chebtech.default_dtype)
+
+    @staticmethod
+    def ones(n):
+        return np.ones(n, dtype=Chebtech.default_dtype)
+
+    @staticmethod
+    def eye(n):
+        return np.eye(n, dtype=Chebtech.default_dtype)
 
     @staticmethod
     def chebpts(n):
@@ -940,7 +902,7 @@ class Chebtech:
             x = Chebtech.empty_array()
         # Special case (single point)
         elif n == 1:
-            x = Chebtech.zero_array()
+            x = Chebtech.zeros(1)
         else:
             # Chebyshev points:
             m = n - 1
@@ -1168,20 +1130,20 @@ class Chebtech:
 
         # Pad with zeros:
         if m > n:
-            aliased_coeffs = np.r_[coeffs, Chebtech.zero_array(m-n)]
+            aliased_coeffs = np.r_[coeffs, Chebtech.zeros(m-n)]
             return aliased_coeffs
 
         # Alias coefficients: (see eq. (4.4) of Trefethen, Approximation Theory and
         # Approximation Practice, SIAM, 2013):
 
-        aliased_coeffs = Chebtech.zero_array(m)
+        aliased_coeffs = Chebtech.zeros(m)
 
         if m == 0:
             return aliased_coeffs
 
         if m == 1:
             # Reduce to a single point:
-            e = np.ones(n//2 + n%2)
+            e = Chebtech.ones(n//2 + n%2)
             e[1::2] = -1.0
             aliased_coeffs = np.dot(e, coeffs[::2])
             return aliased_coeffs
