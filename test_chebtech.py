@@ -453,45 +453,16 @@ class TestChebtechMethods(unittest.TestCase):
         
         f = Chebtech(lambda x: x*(x - 1.0)*np.sin(x) + 1.0)
         g = f.cumsum().diff()
-        err = f[x] - g[x]
+        err = f(x) - g(x)
         tol = 10*g.vscale()*np.spacing(1)
         self.assertTrue(linalg.norm(err, np.inf) < 100 * tol)
 
         h = f.diff().cumsum()
-        err = f[x] - h[x]
+        err = f(x) - h(x)
         tol = 10*h.vscale()*np.spacing(1)
         self.assertTrue((np.std(err) < tol)  and (np.abs(h[-1]) < tol))
         
 
 if __name__ == '__main__':
-    k = 500;
-    f = Chebtech(fun=lambda x: np.sin(np.pi*k*x))
-    r = f.roots()
-   
     suite = unittest.TestLoader().loadTestsFromTestCase(TestChebtechMethods)
     unittest.TextTestRunner(verbosity=2).run(suite)
-
-    f = Chebtech(coeffs=[0, 0, 1])
-    f.roots()
-    print(f.coeffs)
-    g = Chebtech(coeffs=[0, 1])
-    print('roots of x are:')
-    print(g.roots())
-
-    l = Chebtech(coeffs=[0, 0, 0, 1])
-    #print(roots(l))
-    h = f + g
-    k = g + f
-    print( h.coeffs)
-    print( k.coeffs)
-    print( 'f[0] = %s' % f[0] )
-
-    #f.plot()
-    g = f.cumsum()
-    #g.plot()
-
-    f = Chebtech(coeffs=[1, .75, 0, .25])
-    print(f.coeffs)
-
-    #r = roots(f)
-    #print(r)
