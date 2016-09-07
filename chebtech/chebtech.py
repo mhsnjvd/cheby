@@ -434,8 +434,6 @@ class Chebtech:
         return out
 
         
-        
-
 
     def cumsum(self):
         """Indefinite integral of a CHEBTECH.
@@ -789,19 +787,58 @@ class Chebtech:
         if not isinstance(other, Chebtech):
             return self.__rmul__(other)
 
-        result = Chebtech()
-        n = self.length()
-        m = other.length()
-        if n >= m:
-            coeffs = np.r_[other.coeffs, Chebtech.zeros(n-m)]
-            result.coeffs = self.coeffs - coeffs
-        else:
-            coeffs = np.r_[self.coeffs, Chebtech.zeros(m-n)]
-            result.coeffs = other.coeffs - coeffs
+        n = len(self.coeffs)
+        m = len(other.coeffs)
 
-        result.values = Chebtech.coeffs2vals(result.coeffs)
+        if ( n == 0 or m == 0): # Empty cases
+            return Chebtech()
+        elif ( n == 1): # Constant case
+            return __rmul__(other, self.coeffs[0])
+        elif ( m == 1): # Constant case
+            return __rmul__(slef, other.coeffs[0])
+        else: # General case
+            fc = np.r_[ self.coeffs[:], Chebtech.zeros(m+1)]
+            gc = np.r_[other.coeffs[:], Chebtech.zeros(n+1)]
 
-        return result
+            #mn = size(fc, 1);
+            # N = m + n + 1
+            N = len(fc)
+            #t = [2*fc(1,:) ; fc(2:end,:)];                    % Toeplitz vector.
+            t = np.r_[2.0*fc[0], fc[1:]]
+            #x = [2*gc(1,:) ; gc(2:end,:)];                    % Embed in Circulant.
+            x = np.r_[2.0*gc[0], gc[1:]]
+            #xprime = fft([x ; x(end:-1:2,:)]);                % FFT for Circulant mult.
+            xprime = np.fft.fft(np.r_[x, x[-1:0:-1]])
+            #aprime = fft([t ; t(end:-1:2,:)]);
+            aprime = np.fft.fft(np.r_[t, t[-1:0:-1]])
+            #Tfg = ifft(aprime.*xprime);                   % Diag in function space.
+            Tfq = np.fft.ifft(aprime * xprime)
+            #hc = .25*[Tfg(1,:); Tfg(2:end,:) + Tfg(end:-1:2,:)];% Extract out result.
+            out_coeffs = 0.25 * np.r_[Tfq[0], Tfq[1:] + Tfq[-1:0:-1]]
+            #hc = hc(1:mn,:);                                % Take the first half.
+            out_coeffs = out_coeffs[:N]
+
+            result = Chebtech(coeffs=out_coeffs)
+
+            # Check for two cases where the output is known in advance to be positive,
+            # namely F == conj(G) or F == G and isreal(F).
+            result_is_positive = (np.all(self.coeffs == other.coeffs) and self.isreal()) or (np.all(np.conjugate(self.coeffs) == other.coeffs))
+
+            #% [TODO] Update ishappy:
+            #f.ishappy = f.ishappy && g.ishappy;
+
+            # Simplify!
+            result = result.simplify()
+
+            if result_is_positive:
+                # Here we know that the product of F and G should be positive. However,
+                # SIMPLIFY may have destroyed this property, so we enforce it.
+                values = Chebtech.coeffs2vals(result.coeffs)
+                values = np.abs(values)
+                result.coeffs = Chebtech.vals2coeffs(values)
+                result.values = values
+            return result
+
 
     def __rmul__(self, other):
         result = Chebtech()

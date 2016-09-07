@@ -346,7 +346,7 @@ class TestChebtechMethods(unittest.TestCase):
         # self.assertEqual(len(r), 2)
         # self.assertTrue(linalg.norm( r - np.r_[1.0j, -1.0j]/5.0, np.inf) < 10*len(f)*np.spacing(1))
 
-        #[TODO] Enable recursion in roots
+        #[TODO] We get different number of roots
         #f = Chebtech(fun=lambda x: np.sin(100*np.pi*x))
         #r1 = f.roots(complex_roots=True, recurse=False)
         #r2 = f.roots(complex_roots=True)
@@ -385,7 +385,6 @@ class TestChebtechMethods(unittest.TestCase):
         self.assertTrue(spotcheck_max(lambda x: ((x-0.2)**3 - (x-0.2) + 1)*1.0/np.cos(x-0.2), 1.884217141925336))
         self.assertTrue(spotcheck_max(lambda x: np.sin(10*x), 1.0))
         # self.assertTrue(spotcheck_max(lambda x: airy, airy(-1)))
-        f = Chebtech(fun=lambda x:  -1.0/(1.0 + x**2))
         self.assertTrue(spotcheck_max(lambda x:  -1.0/(1.0 + x**2), -0.5))
         self.assertTrue(spotcheck_max(lambda x: (x - 0.25)**3 * np.cosh(x), 0.75**3*np.cosh(1.0)))
 
@@ -393,6 +392,29 @@ class TestChebtechMethods(unittest.TestCase):
         # Test for complex-valued chebtech objects.
         self.assertTrue(spotcheck_max(lambda x: (x - 0.2)*(np.exp(1.0j*(x - 0.2))+1.0j*np.sin(x - 0.2)), -0.434829305372008 + 2.236893806321343j))
 
+
+    def test_min(self):
+        def spotcheck_min(fun_op, exact_min):
+            # Spot-check the results for a given function.
+            f = Chebtech(fun=fun_op)
+            y = f.min()
+            x = f.argmin()
+            fx = fun_op(x)
+            result = ((np.abs(y - exact_min) < 1.0e2*f.vscale()*np.spacing(1)) and (np.abs(fx - exact_min) < 1.0e2*f.vscale()*np.spacing(1)))
+
+            return result
+        # Spot-check the extrema for a few functions.
+
+        self.assertTrue(spotcheck_min(lambda x:  -((x-0.2)**3 -(x-0.2) + 1)*1.0/np.cos(x-0.2), -1.884217141925336))
+        self.assertTrue(spotcheck_min(lambda x:  -np.sin(10*x), -1.0))
+        #self.assertTrue(spotcheck_min(lambda x:  -airy(x), -airy(-1), pref);
+        self.assertTrue(spotcheck_min(lambda x:  1.0/(1 + x**2), 0.5))
+        self.assertTrue(spotcheck_min(lambda x:  -(x - 0.25)**3.*np.cosh(x), -0.75**3*np.cosh(1.0)))
+        
+        
+        # Test for complex-valued chebtech objects.
+        self.assertTrue(spotcheck_min(lambda x: np.exp(1.0j*x)-0.5j*np.sin(x)+x, 0.074968381369117 - 0.319744137826069j))
+        
     def test_cumsum(self):
         # Generate a few random points to use as test values.
 
@@ -464,5 +486,7 @@ class TestChebtechMethods(unittest.TestCase):
         
 
 if __name__ == '__main__':
+    f = Chebtech(fun=lambda x: np.exp(1.0j*x)-0.5j*np.sin(x)+x)
+    f.minandmax()
     suite = unittest.TestLoader().loadTestsFromTestCase(TestChebtechMethods)
     unittest.TextTestRunner(verbosity=2).run(suite)
