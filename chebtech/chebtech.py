@@ -751,6 +751,8 @@ class Chebtech:
         result = Chebtech()
         n = self.length()
         m = other.length()
+        if n == 0 or m == 0:
+            return result
         if n >= m:
             coeffs = np.r_[other.coeffs, Chebtech.zeros(n-m)]
             result.coeffs = self.coeffs + coeffs

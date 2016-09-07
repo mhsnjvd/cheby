@@ -283,20 +283,118 @@ class TestChebtechMethods(unittest.TestCase):
         c2 = Chebtech.vals2coeffs(v2);
         self.assertTrue(linalg.norm(c1 - c2, np.inf) < n*tol)
 
+    def test_radd(self):
+        # Generate a few random points to use as test values.
+        np.random.seed(6178)
+        x = -1 + 2.0 * np.random.rand(100)
 
-    
+        # A random number to use as an arbitrary additive constant.
+        alpha = -0.194751428910640 + 0.079812875412665j
+
+        # Check addition with scalars.
+        
+        f_op = lambda x: np.sin(x);
+        f = Chebtech(f_op)
+
+        # Test the addition of a CHEBTECH F, specified by F_OP, to a scalar ALPHA using
+        # a grid of points X in [-1  1] for testing samples.
+        g1 = f + alpha
+        g2 = alpha + f
+        self.assertTrue(g1==g2)
+        g_exact = lambda x: f_op(x) + alpha
+        self.assertTrue(linalg.norm(g1(x) - g_exact(x), np.inf) <= 10*np.max(g1.vscale()*np.spacing(1)))
+
+    def test_add(self):
+
+        # Test the addition of two CHEBTECH objects F and G, specified by F_OP and
+        # G_OP, using a grid of points X in [-1  1] for testing samples.
+        def test_add_function_to_function(f, f_op, g, g_op, x):
+            h1 = f + g
+            h2 = g + f
+            result_1 = h1 == h2
+            h_exact = lambda x: f_op(x) + g_op(x)
+            result_2 = linalg.norm(h1(x) - h_exact(x), np.inf) <= 1e4*np.max(h1.vscale()*np.spacing(1))
+
+            return result_1 and result_2
+
+        # Generate a few random points to use as test values.
+        np.random.seed(6178)
+        x = -1 + 2.0 * np.random.rand(100)
+
+        # A random number to use as an arbitrary additive constant.
+        alpha = -0.194751428283640 + 0.079814485412665j;
+
+        # Check operation in the face of empty arguments.
+        
+        f = Chebtech()
+        g = Chebtech(lambda x: x)
+        self.assertEqual(len(f+f), 0)
+        self.assertEqual(len(f+g), 0)
+        self.assertEqual(len(g+f), 0)
+        
+        
+        # Check addition of two chebtech objects.
+        
+        f_op = lambda x: np.zeros(len(x));
+        f = Chebtech(f_op)
+        self.assertTrue(test_add_function_to_function(f, f_op, f, f_op, x))
+        
+        f_op = lambda x: np.exp(x) - 1.0
+        f = Chebtech(f_op)
+        
+        g_op = lambda x: 1.0/(1.0 + x**2)
+        g = Chebtech(g_op)
+        self.assertTrue(test_add_function_to_function(f, f_op, g, g_op, x))
+        
+        g_op = lambda x: np.cos(1e4*x)
+        g = Chebtech(g_op)
+        self.assertTrue(test_add_function_to_function(f, f_op, g, g_op, x))
+        
+        
+        g_op = lambda t: np.sinh(t*np.exp(2.0*np.pi*1.0j/6.0))
+        g = Chebtech(g_op)
+        self.assertTrue(test_add_function_to_function(f, f_op, g, g_op, x))
+        
+        # Check that direct construction and PLUS give comparable results.
+        tol = 10*np.spacing(1)
+        f = Chebtech(lambda x: x)
+        g = Chebtech(lambda x: np.cos(x) - 1.0)
+        h1 = f + g
+        h2 = Chebtech(lambda x: x + np.cos(x) - 1.0)
+        
+        self.assertTrue(linalg.norm(h1.coeffs - h2.coeffs, np.inf) < tol)
+
+        #%
+        # Check that adding a CHEBTECH to an unhappy CHEBTECH gives an unhappy
+        # result.  
+
+        #f = Chebtech(lambda x: np.cos(x+1));    # Happy
+        #g = Chebtech(lambda x: np.sqrt(x+1));   # Unhappy
+        #h = f + g;  # Add unhappy to happy.
+        #self.assertTrue(n, 20) = (~g.ishappy) && (~h.ishappy);
+        #h = g + f;  # Add happy to unhappy.
+        #self.assertTrue(n, 21) = (~g.ishappy) && (~h.ishappy);
+
+    def test_rmul(self):
+        # Test the multiplication of a CHEBTECH F, specified by F_OP, by a scalar ALPHA
+        # Generate a few random points to use as test values.
+        np.random.seed(1918)
+        x = -1 + 2.0 * np.random.rand(100)
+
+        # Random numbers to use as arbitrary multiplicative constants.
+        alpha = -0.114758928283644 + 0.072473485412265j
+
+        # Check multiplication by scalars.
+        f_op = lambda x: np.sin(x)
+        f = Chebtech(fun=f_op)
+        g1 = f * alpha
+        g2 = alpha * f
+        self.assertTrue(g1==g2)
+        g_exact = lambda x: f_op(x) * alpha
+        self.assertTrue(linalg.norm(g1(x) - g_exact(x), np.inf) < 10*np.max(g1.vscale()*np.spacing(1)))
 
     def test_mul(self):
 
-        # Test the multiplication of a CHEBTECH F, specified by F_OP, by a scalar ALPHA
-        # using a grid of points X in [-1  1] for testing samples.
-        def test_rmul(f, f_op, alpha, x):
-            g1 = f * alpha;
-            g2 = alpha * f;
-            result_1 = g1 == g2
-            g_exact = lambda x: f_op(x) * alpha
-            result_2 = linalg.norm(g1(x) - g_exact(x), np.inf) < 10*np.max(g1.vscale()*np.spacing(1))
-            return result_1 and result_2
 
         # Test the multiplication of two CHEBTECH objects F and G, specified by F_OP and
         # G_OP, using a grid of points X in [-1  1] for testing samples.  If CHECKPOS is
@@ -319,8 +417,6 @@ class TestChebtechMethods(unittest.TestCase):
 
         # Random numbers to use as arbitrary multiplicative constants.
         alpha = -0.194758928283640 + 0.075474485412665j
-        beta = -0.526634844879922 - 0.685484380523668j
-
 
         # Check operation in the face of empty arguments.
         
@@ -329,13 +425,6 @@ class TestChebtechMethods(unittest.TestCase):
         self.assertEqual(len(f*f), 0)
         self.assertEqual(len(f*g), 0)
         self.assertEqual(len(g*f), 0)
-        
-        # Check multiplication by scalars.
-        
-        f_op = lambda x: np.sin(x)
-        f = Chebtech(fun=f_op)
-
-        self.assertTrue(test_rmul(f, f_op, alpha, x))
         
         # Check multiplication by constant functions.
         
