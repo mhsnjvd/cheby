@@ -219,7 +219,7 @@ class Chebtech:
         if not np.any(c):
             # [TODO] we need a tolerance here on c?
             # Input was purely imaginary, so output a zero CHEBTECH:
-            return Chebtech(coeffs=[0.0])
+            return Chebtech(coeffs=Chebtech.zeros(1))
         else:
             return Chebtech(coeffs=c)
 
@@ -232,9 +232,21 @@ class Chebtech:
         if not np.any(c):
             # [TODO] we need a tolerance here on c?
             # Input was purely real, so output a zero CHEBTECH:
-            return Chebtech(coeffs=[0.0])
+            return Chebtech(coeffs=Chebtech.zeros(1))
         else:
             return Chebtech(coeffs=c)
+
+    def conjugate(self):
+        """Conjugate of a Chebtech."""
+        if self.isreal():
+            return copy.deepcopy(self)
+        else:
+            coeffs = np.conjugate(self.coeffs)
+            return Chebtech(coeffs=coeffs)
+
+    def conj(self):
+        """Alias of conjugate"""
+        return self.conjugate()
 
     def abs(self):
         #ABS   Absolute value of a CHEBTECH object.
@@ -793,9 +805,9 @@ class Chebtech:
         if ( n == 0 or m == 0): # Empty cases
             return Chebtech()
         elif ( n == 1): # Constant case
-            return __rmul__(other, self.coeffs[0])
+            return other.__rmul__(self.coeffs[0])
         elif ( m == 1): # Constant case
-            return __rmul__(slef, other.coeffs[0])
+            return self.__rmul__(other.coeffs[0])
         else: # General case
             fc = np.r_[ self.coeffs[:], Chebtech.zeros(m+1)]
             gc = np.r_[other.coeffs[:], Chebtech.zeros(n+1)]

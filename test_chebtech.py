@@ -284,6 +284,132 @@ class TestChebtechMethods(unittest.TestCase):
         self.assertTrue(linalg.norm(c1 - c2, np.inf) < n*tol)
 
 
+    
+
+    def test_mul(self):
+
+        # Test the multiplication of a CHEBTECH F, specified by F_OP, by a scalar ALPHA
+        # using a grid of points X in [-1  1] for testing samples.
+        def test_rmul(f, f_op, alpha, x):
+            g1 = f * alpha;
+            g2 = alpha * f;
+            result_1 = g1 == g2
+            g_exact = lambda x: f_op(x) * alpha
+            result_2 = linalg.norm(g1(x) - g_exact(x), np.inf) < 10*np.max(g1.vscale()*np.spacing(1))
+            return result_1 and result_2
+
+        # Test the multiplication of two CHEBTECH objects F and G, specified by F_OP and
+        # G_OP, using a grid of points X in [-1  1] for testing samples.  If CHECKPOS is
+        # TRUE, an additional check is performed to ensure that the values of the result
+        # are all nonnegative; otherwise, this check is skipped.
+        def test_mul_function_by_function(f, f_op, g, g_op, x, check_positive):
+            h = f * g
+            h_exact = lambda x: f_op(x) * g_op(x)
+            tol = 1e4*np.max(h.vscale()*np.spacing(1))
+            result_1 = linalg.norm(h(x) - h_exact(x), np.inf) < tol
+            result_2 = True
+            if check_positive:
+                values = h.coeffs2vals(h.coeffs)
+                result_2 = np.all(values >= -tol)
+            return result_1 and result_2
+
+        # Generate a few random points to use as test values.
+        np.random.seed(6178)
+        x = -1 + 2.0 * np.random.rand(100)
+
+        # Random numbers to use as arbitrary multiplicative constants.
+        alpha = -0.194758928283640 + 0.075474485412665j
+        beta = -0.526634844879922 - 0.685484380523668j
+
+
+        # Check operation in the face of empty arguments.
+        
+        f = Chebtech()
+        g = Chebtech(fun=lambda x: x)
+        self.assertEqual(len(f*f), 0)
+        self.assertEqual(len(f*g), 0)
+        self.assertEqual(len(g*f), 0)
+        
+        # Check multiplication by scalars.
+        
+        f_op = lambda x: np.sin(x)
+        f = Chebtech(fun=f_op)
+
+        self.assertTrue(test_rmul(f, f_op, alpha, x))
+        
+        # Check multiplication by constant functions.
+        
+        f_op = lambda x: np.sin(x);
+        f = Chebtech(f_op)
+        g_op = lambda x: np.zeros(len(x)) + alpha
+        g = Chebtech(g_op)
+        self.assertTrue(test_mul_function_by_function(f, f_op, g, g_op, x, False))
+        
+        # Spot-check multiplication of two chebtech objects for a few test 
+        # functions.
+        
+        f_op = lambda x: np.ones(len(x))
+        f = Chebtech(f_op)
+        self.assertTrue(test_mul_function_by_function(f, f_op, f, f_op, x, False))
+        
+        f_op = lambda x: np.exp(x) - 1.0
+        f = Chebtech(f_op)
+        
+        g_op = lambda x: 1.0/(1.0 + x**2)
+        g = Chebtech(g_op)
+        self.assertTrue(test_mul_function_by_function(f, f_op, g, g_op, x, False))
+        
+        g_op = lambda x: np.cos(1.0e4*x);
+        g = Chebtech(g_op)
+        self.assertTrue(test_mul_function_by_function(f, f_op, g, g_op, x, False))
+        
+        g_op = lambda t: np.sinh(t*np.exp(2.0*np.pi*1.0j/6.0))
+        g = Chebtech(g_op)
+        self.assertTrue(test_mul_function_by_function(f, f_op, g, g_op, x, False))
+        
+        
+        # Check specially handled cases, including some in which an adjustment for
+        # positivity is performed.
+        
+        f_op = lambda t: np.sinh(t*np.exp(2.0*np.pi*1.0j/6.0));
+        f = Chebtech(f_op)
+        self.assertTrue(test_mul_function_by_function(f, f_op, f, f_op, x, False))
+        
+        g_op = lambda t: np.conjugate(np.sinh(t*np.exp(2.0*np.pi*1.0j/6.0)))
+        g = f.conj()
+        self.assertTrue(test_mul_function_by_function(f, f_op, g, g_op, x, True))
+        
+        f_op = lambda x: np.exp(x) - 1.0;
+        f = Chebtech(f_op)
+        self.assertTrue(test_mul_function_by_function(f, f_op, f, f_op, x, True))
+        
+        # Check that multiplication and direct construction give similar results.
+        
+        tol = 50*np.spacing(1)
+        g_op = lambda x: 1.0/(1.0 + x**2)
+        g = Chebtech(g_op)
+        h1 = f * g
+        h2 = Chebtech(lambda x: f_op(x) * g_op(x))
+        #[TODO] implement prolong:
+        #h2 = prolong(h2, length(h1));
+        #self.assertTrue(linalg.norm(h1.coeffs - h2.coeffs, np.inf) < tol)
+        
+        #%
+        # Check that multiplying a CHEBTECH by an unhappy CHEBTECH gives an unhappy
+        # result.  
+
+        #[TODO] implement happiness :)
+
+        #warning off; # Suppress expected warnings about unhappy operations.
+        #f = Chebtech(lambda x: cos(x+1));    # Happy
+        #g = Chebtech(lambda x: sqrt(x+1));   # Unhappy
+        #h = f.*g;  # Multiply unhappy by happy.
+        #pass(n, 23) = (~g.ishappy) && (~h.ishappy); ##ok<*BDSCI,*BDLGI>
+        #h = g.*f;  # Multiply happy by unhappy.
+        #pass(n, 24) = (~g.ishappy) && (~h.ishappy);
+        #warning on; # Re-enable warnings.
+
+
     def test_roots(self):
 
         func = lambda x: (x+1)*50;
@@ -421,7 +547,6 @@ class TestChebtechMethods(unittest.TestCase):
         np.random.seed(6178)
         x = 2 * np.random.rand(100) - 1;
 
-
         # Spot-check antiderivatives for a couple of functions.  We verify that the
         # chebtech antiderivatives match the true ones up to a constant by checking 
         # that the standard deviation of the difference between the two on a large 
@@ -483,10 +608,7 @@ class TestChebtechMethods(unittest.TestCase):
         err = f(x) - h(x)
         tol = 10*h.vscale()*np.spacing(1)
         self.assertTrue((np.std(err) < tol)  and (np.abs(h[-1]) < tol))
-        
 
 if __name__ == '__main__':
-    f = Chebtech(fun=lambda x: np.exp(1.0j*x)-0.5j*np.sin(x)+x)
-    f.minandmax()
     suite = unittest.TestLoader().loadTestsFromTestCase(TestChebtechMethods)
     unittest.TextTestRunner(verbosity=2).run(suite)
