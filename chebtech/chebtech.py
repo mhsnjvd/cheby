@@ -742,7 +742,16 @@ class Chebtech:
 
     def simplify(self):
         return copy.deepcopy(self)
-                
+
+    def flipud(self):
+        """FLIPUD   Flip/reverse a CHEBTECH object.
+           G = FLIPUD(F) returns G such that G(x) = F(-x) for all x in [-1,1].
+        """
+
+        # Negate the odd coefficients:
+        self.coeffs[1::2] = -self.coeffs[1::2]
+        # Note: the first odd coefficient is at index 2.
+
 
     def __add__(self, other):
         if not isinstance(other, Chebtech):
@@ -772,12 +781,14 @@ class Chebtech:
         result = Chebtech()
         n = self.length()
         m = other.length()
+        if n == 0 or m == 0:
+            return result
         if n >= m:
             coeffs = np.r_[other.coeffs, Chebtech.zeros(n-m)]
             result.coeffs = self.coeffs - coeffs
         else:
             coeffs = np.r_[self.coeffs, Chebtech.zeros(m-n)]
-            result.coeffs = other.coeffs - coeffs
+            result.coeffs = coeffs - other.coeffs
 
         result.values = Chebtech.coeffs2vals(result.coeffs)
 

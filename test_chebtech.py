@@ -302,7 +302,8 @@ class TestChebtechMethods(unittest.TestCase):
         g2 = alpha + f
         self.assertTrue(g1==g2)
         g_exact = lambda x: f_op(x) + alpha
-        self.assertTrue(linalg.norm(g1(x) - g_exact(x), np.inf) <= 10*np.max(g1.vscale()*np.spacing(1)))
+        tol = 10 * g1.vscale()*np.spacing(1)
+        self.assertTrue(linalg.norm(g1(x) - g_exact(x), np.inf) <= tol)
 
     def test_add(self):
 
@@ -311,9 +312,10 @@ class TestChebtechMethods(unittest.TestCase):
         def test_add_function_to_function(f, f_op, g, g_op, x):
             h1 = f + g
             h2 = g + f
-            result_1 = h1 == h2
+            result_1 = (h1 == h2)
             h_exact = lambda x: f_op(x) + g_op(x)
-            result_2 = linalg.norm(h1(x) - h_exact(x), np.inf) <= 1e4*np.max(h1.vscale()*np.spacing(1))
+            tol = 1e4*h1.vscale()*np.spacing(1)
+            result_2 = (linalg.norm(h1(x) - h_exact(x), np.inf) <= tol)
 
             return result_1 and result_2
 
@@ -374,6 +376,104 @@ class TestChebtechMethods(unittest.TestCase):
         #self.assertTrue(n, 20) = (~g.ishappy) && (~h.ishappy);
         #h = g + f;  # Add happy to unhappy.
         #self.assertTrue(n, 21) = (~g.ishappy) && (~h.ishappy);
+
+
+
+    def test_rsub(self):
+        # Check subtraction with scalars.
+        np.random.seed(6178)
+        # Generate a few random points to use as test values.
+        x = -1.0 + 2.0 * np.random.rand(100)
+
+        # A random number to use as an arbitrary additive constant.
+        alpha = np.random.randn() + 1.0j*np.random.randn()
+        
+        f_op = lambda x: np.sin(x)
+        f = Chebtech(f_op)
+
+        # Test the subtraction of a CHEBTECH F, specified by F_OP, to and from a scalar
+        # ALPHA using a grid of points X in [-1  1] for testing samples.
+        g1 = f - alpha
+        g2 = alpha - f
+        self.assertTrue(g1==g2)
+        g_exact = lambda x: f_op(x) - alpha
+
+        #[TODO] can we bring this tolerance down?
+        tol = 1.0e2 * g1.vscale() * np.spacing(1)
+        self.assertTrue(linalg.norm(g1(x) - g_exact(x), np.inf) <= tol)
+
+    def test_sub(self):
+        # Test the subraction of two CHEBTECH objects F and G, specified by F_OP and
+        # G_OP, using a grid of points X in [-1  1] for testing samples.
+        def test_sub_function_and_function(f, f_op, g, g_op, x):
+            h1 = f - g;
+            h2 = g - f;
+            result_1 = (h1 == (-1*h2))
+            h_exact = lambda x: f_op(x) - g_op(x)
+            tol = 1e4 * h1.vscale() * np.spacing(1)
+            result_2 = (linalg.norm(h1(x) - h_exact(x), np.inf) <= tol)
+            return result_1 and result_2
+
+        np.random.seed(6178)
+        # Generate a few random points to use as test values.
+        x = -1.0 + 2.0 * np.random.rand(100)
+
+        # A random number to use as an arbitrary additive constant.
+        alpha = np.random.randn() + 1.0j*np.random.randn()
+
+        # Check operation in the face of empty arguments.
+        
+        f = Chebtech()
+        g = Chebtech(lambda x: x)
+        self.assertEqual(len(f-f), 0)
+        self.assertEqual(len(f-g), 0)
+        self.assertEqual(len(g-f), 0)
+            
+        
+        # Check subtraction of two chebtech objects.
+        
+        f_op = lambda x: np.zeros(len(x))
+        f = Chebtech(f_op)
+        self.assertTrue(test_sub_function_and_function(f, f_op, f, f_op, x))
+        
+        f_op = lambda x: np.exp(x) - 1;
+        f = Chebtech(f_op)
+        
+        g_op = lambda x: 1.0/(1 + x**2)
+        g = Chebtech(g_op)
+        self.assertTrue(test_sub_function_and_function(f, f_op, g, g_op, x))
+        
+        g_op = lambda x: np.cos(1e4*x)
+        g = Chebtech(g_op)
+        self.assertTrue(test_sub_function_and_function(f, f_op, g, g_op, x))
+        
+        g_op = lambda t: np.sinh(t*np.exp(2.0*np.pi*1.0j/6))
+        g = Chebtech(g_op)
+        self.assertTrue(test_sub_function_and_function(f, f_op, g, g_op, x))
+        
+        
+        # Check that direct construction and MINUS give comparable results.
+        
+        tol = 10*np.spacing(1)
+        f = Chebtech(lambda x: x)
+        g = Chebtech(lambda x: np.cos(x) - 1)
+        h1 = f - g
+        h2 = Chebtech(lambda x: x - (np.cos(x) - 1))
+        h3 = h1 - h2
+        self.assertTrue(linalg.norm(h3.coeffs, np.inf) < tol)
+
+        # [TODO]
+        # Check that subtracting a CHEBTECH and an unhappy CHEBTECH gives an
+        # unhappy result.  
+
+        #f = Chebtech(lambda x: np.cos(x+1))    # Happy
+        #g = Chebtech(lambda x: np.sqrt(x+1))   # Unhappy
+        #h = f - g;  # Subtract unhappy from happy.
+        #self.assertTrue( 20) = (~g.ishappy) && (~h.ishappy);
+        #h = g - f;  # Subtract happy from unhappy.
+        #self.assertTrue( 21) = (~g.ishappy) && (~h.ishappy);
+
+
 
     def test_rmul(self):
         # Test the multiplication of a CHEBTECH F, specified by F_OP, by a scalar ALPHA
@@ -630,6 +730,55 @@ class TestChebtechMethods(unittest.TestCase):
         # Test for complex-valued chebtech objects.
         self.assertTrue(spotcheck_min(lambda x: np.exp(1.0j*x)-0.5j*np.sin(x)+x, 0.074968381369117 - 0.319744137826069j))
         
+
+
+    def test_sum(self):
+        #%
+        # Spot-check integrals for a couple of functions.
+        f = Chebtech(fun=lambda x: np.exp(x) - 1.0)
+        self.assertTrue(np.abs(f.sum() - 0.350402387287603) < 10*f.vscale()*np.spacing(1));
+
+        f = Chebtech(fun=lambda x: 1./(1 + x**2))
+        self.assertTrue(np.abs(f.sum() - np.pi/2.0) < 10*f.vscale()*np.spacing(1))
+
+        f = Chebtech(fun=lambda x: np.cos(1e4*x))
+        exact = -6.112287777765043e-05
+        self.assertTrue(np.abs(f.sum() - exact)/np.abs(exact) < 1e6*f.vscale()*np.spacing(1)) 
+        
+        z = np.exp(2*np.pi*1.0j/6.0)
+        f = Chebtech(fun=lambda t: np.sinh(t*z))
+        self.assertTrue(np.abs(f.sum()) < 10*f.vscale()*np.spacing(1))
+
+        # Check a few basic properties.
+        a = 2.0
+        b = -1.0j
+        f = Chebtech(fun=lambda x: x * np.sin(x**2) - 1)
+        df = f.diff()
+        g = Chebtech(lambda x: np.exp(-x**2))
+        dg = g.diff()
+        fg = f*g
+        gdf = g*df
+        fdg = f*dg
+
+        tol_f = 10*f.vscale()*np.spacing(1)
+        tol_g = 10*f.vscale()*np.spacing(1)
+        tol_df = 10*df.vscale()*np.spacing(1)
+        tol_dg = 10*dg.vscale()*np.spacing(1)
+        tol_fg = 10*fg.vscale()*np.spacing(1)
+        tol_fdg = 10*fdg.vscale()*np.spacing(1)
+        tol_gdf = 10*gdf.vscale()*np.spacing(1)
+
+        # Linearity.
+        self.assertTrue(np.abs((a*f + b*g).sum() - (a*f.sum() + b*g.sum())) < max(tol_f, tol_g))
+
+        # Integration-by-parts.
+        self.assertTrue(np.abs(fdg.sum() - (fg(1) - fg(-1) - gdf.sum())) < np.max(np.r_[tol_fdg, tol_gdf, tol_fg]))
+
+        # Fundamental Theorem of Calculus.
+        self.assertTrue(np.abs(df.sum() - (f(1) - f(-1))) < np.max(np.r_[tol_df, tol_f]))
+        self.assertTrue(np.abs(dg.sum() - (g(1) - g(-1))) < np.max(np.r_[tol_dg, tol_g]))
+
+
     def test_cumsum(self):
         # Generate a few random points to use as test values.
 
