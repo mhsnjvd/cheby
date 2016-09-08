@@ -105,7 +105,7 @@ class Chebtech:
     
     def __init__(self, fun=None, **kwargs):
         self.coeffs = np.array([], dtype=type(self).default_dtype)
-        self.values = np.array([], dtype=type(self).default_dtype)
+        self.ishappy = False
 
         keys = kwargs.keys()
         # [TODO]if 'coeffs' in keys and 'values' in keys:
@@ -113,11 +113,9 @@ class Chebtech:
         if 'coeffs' in keys:
             coeffs = np.asarray(kwargs['coeffs'], dtype=type(self).default_dtype)
             self.coeffs = coeffs.copy()
-            self.values = Chebtech.coeffs2vals(coeffs)
             self.ishappy = True
         if 'values' in keys:
             values = np.asarray(kwargs['values'], dtype=type(self).default_dtype)
-            self.values = values.copy()
             self.coeffs = Chebtech.vals2coeffs(values)
             self.ishappy = True
         if fun is not None:
@@ -142,19 +140,18 @@ class Chebtech:
                 coeffs_mask = np.nonzero(np.abs(coeffs) > tol)[0]
                 if len(coeffs_mask) == 0:
                     self.coeffs = Chebtech.zeros(1)
-                    self.values = Chebtech.zeros(1)
                     return
                 else:
                     n = coeffs_mask[-1] + 1
                     self.coeffs = coeffs[:n]
-                    # Sample values again 
-                    self.values = f(Chebtech.chebpts(len(self.coeffs)))
                     return
             else:
                 n = 2*n
         print('Function did not converge')
         self.ishappy = False
 
+    def get_values(self):
+        return Chebtech.coeffs2vals(self.coeffs)
 
     def length(self):
         return len(self.coeffs)
@@ -170,7 +167,7 @@ class Chebtech:
         if self.length() == 0:
             return np.nan
         else:
-            return np.abs(self.values).max()
+            return np.max(np.abs(self.get_values()))
 
 
     def plot(self):
@@ -179,13 +176,13 @@ class Chebtech:
         plt.show()
 
     def isreal(self):
-        if iszero_numerically(self.values.imag):
+        if iszero_numerically(self.get_values().imag):
             return True
         else:
             return False
 
     def isimag(self):
-        if iszero_numerically(self.values.real):
+        if iszero_numerically(self.get_values().real):
             return True
         else:
             return False
@@ -260,7 +257,7 @@ class Chebtech:
 
         if self.isreal() or self.isimag():
             # Convert to values and then compute ABS(). 
-            return Chebtech(values=np.abs(self.values))
+            return Chebtech(values=np.abs(self.get_values()))
         else:
             # [TODO]
             # f = compose(f, @abs, [], [], varargin{:});
@@ -769,7 +766,7 @@ class Chebtech:
             coeffs = np.r_[self.coeffs, Chebtech.zeros(m-n)]
             result.coeffs = other.coeffs + coeffs
 
-        result.values = Chebtech.coeffs2vals(result.coeffs)
+        result.ishappy = self.ishappy and other.ishappy
 
         return result
 
@@ -790,7 +787,7 @@ class Chebtech:
             coeffs = np.r_[self.coeffs, Chebtech.zeros(m-n)]
             result.coeffs = coeffs - other.coeffs
 
-        result.values = Chebtech.coeffs2vals(result.coeffs)
+        result.ishappy = self.ishappy and other.ishappy
 
         return result
 
@@ -800,8 +797,10 @@ class Chebtech:
         if n == 0:
             result = Chebtech()
         else:
-            result.values = self.values + other
-            result.coeffs = Chebtech.vals2coeffs(result.values)
+            result.coeffs = np.copy(self.coeffs)
+            result.coeffs[0] = result.coeffs[0] + other
+
+        result.ishappy = self.ishappy
 
         return result
 
@@ -871,7 +870,6 @@ class Chebtech:
         if n == 0:
             result = Chebtech()
         else:
-            result.values = self.values * other
             result.coeffs = self.coeffs * other
 
         return result
