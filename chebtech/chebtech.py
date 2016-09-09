@@ -150,7 +150,7 @@ class Chebtech:
         print('Function did not converge')
         self.ishappy = False
 
-    def get_values(self):
+    def values(self):
         return Chebtech.coeffs2vals(self.coeffs)
 
     def length(self):
@@ -167,8 +167,7 @@ class Chebtech:
         if self.length() == 0:
             return np.nan
         else:
-            return np.max(np.abs(self.get_values()))
-
+            return np.max(np.abs(self.values()))
 
     def plot(self):
         x = np.linspace(-1, 1, 2001)
@@ -176,13 +175,13 @@ class Chebtech:
         plt.show()
 
     def isreal(self):
-        if iszero_numerically(self.get_values().imag):
+        if iszero_numerically(self.values().imag):
             return True
         else:
             return False
 
     def isimag(self):
-        if iszero_numerically(self.get_values().real):
+        if iszero_numerically(self.values().real):
             return True
         else:
             return False
@@ -257,7 +256,7 @@ class Chebtech:
 
         if self.isreal() or self.isimag():
             # Convert to values and then compute ABS(). 
-            return Chebtech(values=np.abs(self.get_values()))
+            return Chebtech(values=np.abs(self.values()))
         else:
             # [TODO]
             # f = compose(f, @abs, [], [], varargin{:});
@@ -691,7 +690,7 @@ class Chebtech:
         pos[0] = r[np.argmin(v)]
     
         # Take the minimum of the computed minimum and the function values:
-        values = self.coeffs2vals(self.coeffs);
+        values = Chebtech.coeffs2vals(self.coeffs)
         temp = np.r_[vals[0], values]
         vmin = np.min(temp)
         vindex = np.argmin(temp)
@@ -860,7 +859,6 @@ class Chebtech:
                 values = Chebtech.coeffs2vals(result.coeffs)
                 values = np.abs(values)
                 result.coeffs = Chebtech.vals2coeffs(values)
-                result.values = values
             return result
 
 
