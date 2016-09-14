@@ -160,34 +160,112 @@ class Chebtech:
         plt.plot(x, y)
         plt.show()
 
-    def isreal(self):
-        if iszero_numerically(self.values().imag):
-            return True
-        else:
-            return False
-
-    def isimag(self):
-        if iszero_numerically(self.values().real):
-            return True
-        else:
-            return False
-
-    def isequal(self, other):
-        if not isinstance(other, Chebtech):
-            # [TODO] something must be done
-            print('isequal() accepts a Chebtech object only.')
+    def plotcoeffs(self, style=None, **kwargs):
+        """Display Chebyshev coefficients graphically.
+        PLOTCOEFFS(F) plots the Chebyshev coefficients of a CHEBTECH F on a
+        semilogy scale.  If F is an array-valued CHEBTECH then a curve is plotted
+        for each component (column) of F.
         
-        # Get coefficients and trim zeros at the end
-        a = np.trim_zeros(self.coeffs, 'b')
-        b = np.trim_zeros(self.coeffs, 'b')
+        PLOTCOEFFS(F, S) allows further plotting options, such as linestyle,
+        linecolor, etc, in the standard MATLAB manner. If S contains a string
+        'LOGLOG', the coefficients will be displayed on a log-log scale.
+        
+        H = PLOTCOEFFS(F) returns a column vector of handles to lineseries objects.
+        
+        Note: to make the PLOTCOEFFS easier to read, zero coefficients have a small
+        value added to them (typically EPS*VSCALE(F)) so that the curve displayed is
+        continuous.
+        
+        See also CHEBCOEFFS, PLOT.
+
+        Copyright 2016 by The University of Oxford and The Chebfun Developers. 
+        See http://www.chebfun.org/ for Chebfun information.
+        """
+
+        #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        # DEVELOPER NOTE:
+        #  The undocumented featrue plotcoeffs(f, 'barplot') shows a different kind of
+        #  coeffs plot, which can be more attractive in some situations.
+        #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+        # Aux function needed for padding data for bar plots
+        def padData(x, y):
+            #PADDATA   Pad the x and y data to make a bar plot:
+            xx = np.r_[x+.5, x-.5, x-.5]
+            xx[xx<0] = 0.0
+            n = len(y)
+            nans = np.nan + np.zeros(n)
+            yy = np.r_[y, y, nans]
             
-        # compare coefficients
-        if len(a) != len(b):
-            return False
-        elif np.all(a==b):
-            return True
+            return xx, yy
+
+        # Deal with an empty input:
+        if not self:
+            return
+
+        # Set defaults:
+        loglogPlot = kwargs.setdefault('loglog', False)
+        doBar = kwargs.setdefault('barplot', False)
+        domain = kwargs.setdefault('domain', np.r_[-1.0, 1.0])
+
+        # [TODO]: Store the hold state of the current axis:
+        # holdState = ishold
+        holdState = False
+
+        # The coefficients and vertical scale:
+        absCoeffs = np.abs(self.coeffs)
+        vscl = self.vscale()
+
+        # Add a tiny amount to zeros to make plots look nicer:
+        if vscl > 0:
+            if doBar:
+                absCoeffs[absCoeffs < (np.spacing(1)*vscl)/100.0] = 0.0
+            else:
+                # Min of eps*vscale and the minimum non-zero coefficient:
+                min_nonzero_coeff = np.min(absCoeffs[np.nonzero(absCoeffs)])
+                absCoeffs[absCoeffs == 0.0] = np.min(np.r_[np.spacing(1)*vscl, min_nonzero_coeff])
         else:
-            return False
+            # Add eps for zero CHEBTECHs:
+            absCoeffs = absCoeffs + np.spacing(1)
+
+        # Get the size:
+        n = len(absCoeffs)
+
+        xx = np.r_[0.0:n]
+        yy = absCoeffs
+        if doBar:
+            xx, yy = padData(xx, yy)
+
+        # Plot the coeffs:
+        plt.semilogy(xx, yy, style=style)
+
+        current_axis = plt.gca()
+        
+        current_axis.hold(True)
+
+
+        # Do a loglog plot:
+        if loglogPlot:
+            current_axis.xscale('log')
+
+        # Return hold state to what it was before:
+        if not holdState:
+            current_axis.hold(False)
+
+        # Adjust xLim:
+        xLim = current_axis.get_xlim()
+        current_axis.set_xlim([np.min([xLim[0], 0.0]), np.max([xLim[1], n])])
+
+        # Add title and labels
+        current_axis.set_title('Chebyshev coefficients')
+        current_axis.set_xlabel('Degree of Chebyshev polynomial')
+        current_axis.set_ylabel('Magnitude of coefficient')
+
+        # By default, set grid on
+        current_axis.grid(True)
+
+        return current_axis
+
 
     def __eq__(self, other):
         return self.isequal(other)
@@ -220,15 +298,136 @@ class Chebtech:
 
     def conjugate(self):
         """Conjugate of a Chebtech."""
+        out = copy.deepcopy(self)
         if self.isreal():
-            return copy.deepcopy(self)
+            return out
         else:
-            coeffs = np.conjugate(self.coeffs)
-            return Chebtech(coeffs=coeffs)
+            out.coeffs = np.conjugate(out.coeffs)
+            return out
 
     def conj(self):
         """Alias of conjugate"""
         return self.conjugate()
+
+    def fix(self):
+        # Evaluate at the two end points, and an arbitrary interior point:
+        arbitraryPoint = 0.1273123881594
+        fx = self([-1.0, arbitraryPoint, 1.0])
+        # Take the mean:
+        meanfx = np.mean(fx)
+        # Compute the fix:
+        out = Chebtech(coeffs=np.fix(meanfx))
+        return out
+
+    def fliplr(self):
+        """Has no effect on a Chebtech object."""
+        return copy.deepcopy(self)
+
+    def flipud(self):
+        """Flip/reverse a CHEBTECH object.
+          G = FLIPUD(F) returns G such that G(x) = F(-x) for all x in [-1,1].
+
+        Copyright 2016 by The University of Oxford and The Chebfun Developers. 
+        See http://www.chebfun.org/ for Chebfun information.
+        """
+        out = copy.deepcopy(self)
+        # Negate the odd coefficients:
+        out.coeffs[1::2] = -out.coeffs[1::2]
+
+    def floor(self):
+        # Evaluate at the two end points, and an arbitrary interior point:
+        arbitraryPoint = 0.1273123881594
+        fx = self([-1.0, arbitraryPoint, 1.0])
+        # Take the mean:
+        meanfx = np.mean(fx)
+        # Compute the fix:
+        out = Chebtech(coeffs=np.floor(meanfx))
+        return out
+
+    def isequal(self, other):
+        #[TODO] Only coefficients are checked
+        # happiness is not compared
+        if not isinstance(other, Chebtech):
+            # [TODO] something must be done
+            print('isequal() accepts a Chebtech object only.')
+        
+        # Get coefficients and trim zeros at the end
+        a = np.trim_zeros(self.coeffs, 'b')
+        b = np.trim_zeros(self.coeffs, 'b')
+            
+        # compare coefficients
+        if len(a) != len(b):
+            return False
+        elif np.all(a==b):
+            return True
+        else:
+            return False
+
+    def isfinite(self):
+        """Test if a CHEBTECH is bounded.
+        ISFINITE(F) returns FALSE if F has any infinite values and TRUE otherwise.
+        
+        See also ISINF, ISNAN.
+
+        Copyright 2016 by The University of Oxford and The Chebfun Developers. 
+        See http://www.chebfun.org/ for Chebfun information.
+        """
+
+        # Check if coefficients are finite:
+        out = np.all(np.isfinite(self.coeffs))
+
+    def isinf(self):
+        """Test if a CHEBTECH is unbounded.
+        ISINF(F) returns TRUE if F has any infinite values and FALSE otherwise.
+        
+        See also ISFINITE, ISNAN.
+
+        Copyright 2016 by The University of Oxford and The Chebfun Developers. 
+        See http://www.chebfun.org/ for Chebfun information.
+        """
+
+        # Check if any coefficients are infinite:
+        out = np.any(np.isinf(self.coeffs))
+    
+    def isnan(self):
+        """Test if a CHEBTECH has any NaN values.
+        ISNAN(F) returns TRUE if F has any NaN values and FALSE otherwise.
+        
+        See also ISFINITE, ISINF.
+
+        Copyright 2016 by The University of Oxford and The Chebfun Developers. 
+        See http://www.chebfun.org/ for Chebfun information.
+        """
+
+        #Check if any coefficients are NaN:
+        out = np.any(np.isnan(self.coeffs))
+
+    def isreal(self):
+        """True for real CHEBTECH.
+          ISREAL(F) returns TRUE if F does not have an imaginary part and FALSE
+          otherwise.
+        
+        See also REAL, IMAG.
+
+        Copyright 2016 by The University of Oxford and The Chebfun Developers. 
+        See http://www.chebfun.org/ for Chebfun information.
+        """
+
+        #Check if all the coefficients are real:
+        out = np.all(np.isreal(self.coeffs))
+        return out
+
+    def iszero(self):
+        """True for zero CHEBTECH objects.
+          ISZERO(F) returns logical TRUE is F.COEFFS has only zero entries and logical
+          FALSE otherwise.
+
+        Copyright 2016 by The University of Oxford and The Chebfun Developers. 
+        See http://www.chebfun.org/ for Chebfun information.
+        """
+
+        out = not np.any(self.coeffs)
+        return out
 
     def abs(self):
         """Absolute value of a CHEBTECH object.
@@ -241,7 +440,7 @@ class Chebtech:
         See http://www.chebfun.org/ for Chebfun information.
         """
 
-        if self.isreal() or self.isimag():
+        if self.isreal() or (1.0j*self).isreal():
             # Convert to values and then compute ABS(). 
             return Chebtech(values=np.abs(self.values()))
         else:
@@ -909,6 +1108,17 @@ class Chebtech:
             result.coeffs = self.coeffs * other
 
         return result
+
+    def any(self):
+        return np.any(self.coeffs)
+
+    def all(self):
+        r = self.roots()
+        if len(r) == 0:
+            return True
+        else:
+            return False
+        
 
     def __len__(self):
         return self.length()
