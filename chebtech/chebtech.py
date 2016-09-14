@@ -2,6 +2,7 @@ import numpy as np
 from scipy import linalg
 import matplotlib.pyplot as plt
 import copy
+import types
 
 def iszero_numerically(v, tol=None):
     """
@@ -19,12 +20,10 @@ def iszero_numerically(v, tol=None):
         return False
 
 
-
 class Chebtech:
     # Initialize properties of the object
     __default_dtype__ = np.complex128
-    #__default_tol__ = 4.0*np.spacing(1)
-    __default_tol__ = 1.0e-15
+    __default_tol__ = np.spacing(1)
     __default_min_samples__ = 2**4 + 1
     __default_max_samples__ = 2**16 + 1
     
@@ -43,37 +42,95 @@ class Chebtech:
             values = np.asarray(kwargs['values'], dtype=type(self).__default_dtype__)
             self.coeffs = Chebtech.vals2coeffs(values)
             self.ishappy = True
+        if 'coeffs' in keys and 'values' in keys:
+            print('values and coeffs both passed, coeffs have been recomputed using values')
         if fun is not None:
-            self.fun = fun
             self.ishappy = False
             self.__ctor__(fun)
 
-    def __ctor__(self, f):
-        """Construct a chebtech object from a function f."""
-        n_max = type(self).__default_max_samples__
-        tail_length = 5
-        tol = type(self).__default_tol__
-        self.ishappy = False
-        n = 9
-        while ( not self.ishappy and n <= n_max):
-            x = Chebtech.chebpts(n)
-            values = f(x)
-            coeffs = Chebtech.vals2coeffs(values)
-            if np.sum(np.abs(coeffs[-tail_length:])) < tail_length * tol:
-                self.ishappy = True
-                # Trim zeros from the back
-                coeffs_mask = np.where(np.abs(coeffs) > tol)[0]
-                if len(coeffs_mask) == 0:
-                    self.coeffs = Chebtech.zeros(1)
-                    return
-                else:
-                    n = coeffs_mask[-1] + 1
-                    self.coeffs = coeffs[:n]
-                    return
-            else:
-                n = 2*n
-        print('Function did not converge')
-        self.ishappy = False
+    def __ctor__(self, op):
+        """Adaptive construction of a chebtech object from lambda op"""
+
+        if isinstance(op, str):
+            op = eval('lambda x: ' + op)
+
+        #%%%%%%%%%%%%%%%%%%%%%%%%%%% Adaptive construction. %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        # Initialise empty values to pass to refine:
+        values = None
+        ishappy = False
+        vscale = 0.0
+        hscale = 1.0
+
+        # Loop until ISHAPPY or GIVEUP:
+        while True:
+            # Call the appropriate refinement routine: (in PREF.REFINEMENTFUNCTION)
+            values, give_up = Chebtech.refine_by_nesting(op, values)
+
+            # We're giving up! :(
+            if give_up:
+                self.ishappy = False
+                print('Function did not converge after %d samples', len(values))
+                return
+            
+            # Update vertical scale: (Only include sampled finite values)
+            values_temp = np.copy(values)
+            values_temp[~np.isfinite(values)] = 0.0
+            vscale = np.max(np.r_[vscale, np.max(np.abs(values_temp))])
+
+            # Compute the Chebyshev coefficients:
+            self.coeffs = Chebtech.vals2coeffs(values)
+            
+            # Check for happiness:
+            ishappy, cutoff = self.standard_check(values, vscale, hscale, Chebtech.__default_tol__)
+
+            # We're happy! :)
+            if ishappy:
+                # discard unwanted coefficients
+                self.coeffs = self.prolong(cutoff)
+                self.ishappy = ishappy
+                return
+            
+        ############### Assign to CHEBTECH object. ##############
+
+    def prolong(self, nOut):
+        """Manually adjust the number of points used in a CHEBTECH.
+        #   C = PROLONG(F, N) returns coeffs C where LENGTH(C) = N and C represents
+        #   the same function as F but using more or less coefficients than F.
+        #
+        #   If N < LENGTH(F) the representation is compressed by chopping
+        #   coefficients, which may result in a loss of accuracy.
+        #
+        #   If N > LENGTH(F) the coefficients are padded with zeros.
+        #
+        # See also CHEBTECH1/ALIAS, CHEBTECH2/ALIAS.
+
+        # Copyright 2016 by The University of Oxford and The Chebfun Developers.
+        # See http://www.chebfun.org/ for Chebfun information.
+        """
+
+        # Store the number of values the input function has:
+        coeffs = np.copy(self.coeffs)
+        nIn = len(coeffs)
+
+        # nDiff is the number of new values needed (negative if compressing).
+        nDiff = nOut - nIn
+
+        # Trivial case
+        if nDiff == 0:
+            # Nothing to do here!
+            return coeffs
+
+        # nDiff > 0
+        if nDiff > 0:
+            coeffs = np.r_[coeffs, Chebtech.zeros(nDiff)]
+            return coeffs
+
+        # nDiff < 0
+        if nDiff < 0:
+            m = np.max(np.r_[nOut, 0])
+            coeffs = coeffs[:m]
+            return coeffs
+
 
     def values(self):
         return Chebtech.coeffs2vals(self.coeffs)
@@ -96,7 +153,11 @@ class Chebtech:
 
     def plot(self):
         x = np.linspace(-1, 1, 2001)
-        plt.plot(x, self(x)) 
+        y = self(x)
+        if not np.all(np.isreal(y)):
+            print('Discarding imaginary values in plot')
+        y = y.real
+        plt.plot(x, y)
         plt.show()
 
     def isreal(self):
@@ -170,14 +231,15 @@ class Chebtech:
         return self.conjugate()
 
     def abs(self):
-        #ABS   Absolute value of a CHEBTECH object.
-        #   ABS(F) returns the absolute value of F, where F is a CHEBTECH 
-        #   object with no roots in [-1 1]. 
-        #   If ~isempty(roots(F)), then ABS(F) will return garbage
-        #   with no warning. F may be complex.
+        """Absolute value of a CHEBTECH object.
+         ABS(F) returns the absolute value of F, where F is a CHEBTECH 
+         object with no roots in [-1 1]. 
+         If ~isempty(roots(F)), then ABS(F) will return garbage
+         with no warning. F may be complex.
 
-        #  Copyright 2016 by The University of Oxford and The Chebfun Developers.
-        #  See http://www.chebfun.org/ for Chebfun information.
+        Copyright 2016 by The University of Oxford and The Chebfun Developers.
+        See http://www.chebfun.org/ for Chebfun information.
+        """
 
         if self.isreal() or self.isimag():
             # Convert to values and then compute ABS(). 
@@ -185,9 +247,7 @@ class Chebtech:
         else:
             # [TODO]
             # f = compose(f, @abs, [], [], varargin{:});
-            # [TODO]: Is the following a true copy?
-            f = self
-            return f
+            return Chebtech(lambda x: np.abs(self(x)))
 
     def roots(self, **kwargs):
         """Roots of a CHEBTECH in the interval [-1,1].
@@ -658,8 +718,61 @@ class Chebtech:
         minmax, pos = self.minandmax()
         return pos[0]
 
-    def simplify(self):
-        return copy.deepcopy(self)
+    def simplify(self, tol=None):
+        """Remove small trailing Chebyshev coeffs of a happy CHEBTECH object.
+        #  G = SIMPLIFY(F) attempts to compute a 'simplified' version G of the happy
+        #  CHEBTECH object F such that LENGTH(G) <= LENGTH(F) but ||G - F|| is small in
+        #  a relative sense. It does this by calling the routine STANDARDCHOP.
+        #
+        #  If F is not happy, F is returned unchanged.
+        #
+        #  G = SIMPLIFY(F, TOL) does the same as above but uses TOL instead of EPS.  If
+        #  TOL is a row vector with as many columns as F, then TOL(k) will be used as
+        #  the simplification tolerance for column k of F.
+        #
+        # See also STANDARDCHOP.
+
+        # Copyright 2016 by The University of Oxford and The Chebfun Developers.
+        # See http://www.chebfun.org/ for Chebfun information.
+        """
+
+        coeffs = np.copy(self.coeffs)
+        # Deal with empty case.
+        if len(coeffs) == 0:
+            return copy.deepcopy(self)
+
+        # Do nothing to an unhappy CHEBTECH.
+        if not self.ishappy:
+            return copy.deepcopy(self)
+
+        # STANDARDCHOP requires at least 17 coefficients to avoid outright rejection.
+        # STANDARDCHOP also employs a look ahead feature for detecting plateaus. For F
+        # with insufficient length the coefficients are padded using prolong. The
+        # following parameters are chosen explicitly to work with STANDARDCHOP. 
+        # See STANDARDCHOP for details.
+        n_old = len(coeffs)
+        N = int(np.max(np.r_[Chebtech.__default_min_samples__, np.round(n_old*1.25 + 5)]))
+        coeffs = self.prolong(N)
+
+        # After the coefficients of F have been padded with zeros an artificial plateau
+        # is created using the noisy output from the FFT. The slightly noisy plateau is
+        # required since STANDARDCHOP uses logarithms to detect plateaus and this has
+        # undesirable effects when the plateau is made up of all zeros.
+        coeffs = Chebtech.vals2coeffs(Chebtech.coeffs2vals(coeffs))
+
+        # Use the default tolerance if none was supplied.
+        if tol is None:
+            tol = Chebtech.__default_tol__
+
+
+        cutoff = Chebtech.standard_chop(coeffs, tol)
+
+        # Take the minimum of CUTOFF and LENGTH(F). This is necessary when padding was
+        # required.
+        cutoff = np.min(np.r_[cutoff, n_old])
+
+        # Chop coefficients using CUTOFF.
+        return Chebtech(coeffs=coeffs[:cutoff])
 
     def flipud(self):
         """FLIPUD   Flip/reverse a CHEBTECH object.
@@ -809,7 +922,21 @@ class Chebtech:
         #return 'Chebtech object of length %s on [-1, 1]' % self.length()
         return s
     def __call__(self, x):
-        return self[x]
+        if isinstance(x, types.LambdaType):
+            # A lambda has been passed
+            f = x
+            # The square brackets are crucial here
+            # to avoid infinite recursion See __getitem__
+            return Chebtech(lambda x: self[f(x)])
+        elif isinstance(x, Chebtech):
+            # A Chebtech has been passed
+            f = x
+            # Use square brackets in both cases
+            return Chebtech(lambda x: self[f[x]])
+        else:
+            # The square brackets are crucial here
+            # to avoid infinite recursion See __getitem__
+            return self[x]
 
     def __getitem__(self, x):
         # Evaluate the object at the point(s) x:
@@ -1012,22 +1139,26 @@ class Chebtech:
 
     @staticmethod
     def clenshaw(x, c):
-        """Clenshaw's algorithm for evaluating a Chebyshev expansion with coeffs c at x."""
+        """Clenshaw's algorithm for evaluating a Chebyshev expansion with coeffs c at x.
+        c is assumed to be an array
+        x can be a scalar or an array
+        y is returned which is scalar or array depending on x
+        """
+
+
+        # Make sure x is of the right data type:
+        x = np.array(x, dtype=Chebtech.__default_dtype__)
     
         # Clenshaw scheme for scalar-valued functions.
-        bk1 = 0*x
-        bk2 = bk1
-        x = 2*x
-        n = len(c)-1
-        # for k = (n+1):-2:3
-        for k in np.r_[n:1:-2]:
-            # bk2 = c(k) + x.*bk1 - bk2;
-            bk2 = c[k] + x*bk1 - bk2;
-            # bk1 = c(k-1) + x.*bk2 - bk1;
-            bk1 = c[k-1] + x*bk2 - bk1;
+        bk1 = 0.0*x
+        bk2 = np.copy(bk1)
+        x = 2.0*x
+        n = len(c)
+        for k in np.r_[n-1:1:-2]:
+            bk2 = c[k] + x*bk1 - bk2
+            bk1 = c[k-1] + x*bk2 - bk1
     
-        if np.mod(n, 2):
-            # [bk1, bk2] = deal(c(2) + x.*bk1 - bk2, bk1);
+        if not np.mod(n, 2):
             tmp = bk1
             bk1 = c[1] + x * bk1 - bk2
             bk2 = tmp
@@ -1220,9 +1351,10 @@ class Chebtech:
 
             e1 = envelope[j-1]
             e2 = envelope[j2-1]
-            r = 3.0*(1.0 - np.log(e1)/np.log(tol))
-            plateau_found = (e1 == 0.0) or (e2/e1 > r)
-            if plateau_found:
+            if e1 == 0.0:
+                plateau_point = j - 1
+                break
+            elif (e2/e1) > (3.0*(1.0 - np.log(e1)/np.log(tol))):
                 # a plateau has been found: go to Step 3
                 plateau_point = j - 1
                 break
@@ -1259,13 +1391,13 @@ class Chebtech:
                 envelope[j2-1] = tol**(7.0/6.0)
 
             cc = np.log10(envelope[:j2])
-            cc = cc + np.linspace(0, (-1.0/3.0)*log10(tol), j2)
-            d = argmin(cc)
+            cc = cc + np.linspace(0, (-1.0/3.0)*np.log10(tol), j2)
+            d = np.argmin(cc)
             cutoff = np.max(np.r_[d, 1])
-            return coutoff
+            return cutoff
 
 
-    def standard_check(f, values=None, vscale=0.0, hscale=1.0, tol=None):
+    def standard_check(self, values=None, vscale=0.0, hscale=1.0, tol=None):
         """Attempt to trim trailing Chebyshev coefficients in a CHEBTECH.
         #   [ISHAPPY, CUTOFF] = STANDARDCHECK(F) uses the routine STANDARDCHOP to
         #   compute a positive integer CUTOFF which represents the number of
@@ -1286,8 +1418,8 @@ class Chebtech:
         # See http://www.chebfun.org/ for Chebfun information.
         """
 
-        # Grab the coefficients of F.
-        coeffs = np.copy(f.coeffs)
+        # Grab the coefficients
+        coeffs = np.copy(self.coeffs)
         n = len(coeffs)
 
         # Check for NaNs and exit if any are found.
@@ -1300,7 +1432,7 @@ class Chebtech:
 
         # Compute function values of F if none were given.
         if values is None:
-            values = Chebtech.coeffs2vals(f.coeffs)
+            values = Chebtech.coeffs2vals(coeffs)
 
         # Scale TOL by the MAX(DATA.HSCALE, DATA.VSCALE/VSCALE(F)).
         # This choice of scaling is the result of undesirable behavior when using
@@ -1312,10 +1444,15 @@ class Chebtech:
         # HSCALE >> 1. For functions on a single domain with no breaks, this scaling has
         # no effect since HSCALE = 1.
         vscaleF = np.max(np.abs(values))
+
+        #Avoid divide by zero if all values are zero
+        if vscaleF == 0.0:
+            vscaleF = 1.0
+
         tol = tol * np.max(np.r_[hscale, vscale/vscaleF])
 
         # Chop the coefficients:
-        cutoff = standard_chop(coeffs[:], tol)
+        cutoff = Chebtech.standard_chop(coeffs[:], tol)
 
         # Check for happiness.
         ishappy = (cutoff < n)
@@ -1330,7 +1467,7 @@ class Chebtech:
         min_samples = Chebtech.__default_min_samples__
         max_samples = Chebtech.__default_max_samples__
 
-        if len(values) == 0:
+        if (values is None) or (len(values) == 0):
             # Choose initial n based upon min_samples:
             n = int(2.0 ** np.ceil(np.log2(min_samples - 1)) + 1)
         else:
@@ -1345,7 +1482,7 @@ class Chebtech:
         # n is too large:
         if n > max_samples:
             # Don't give up if we haven't sampled at least once.
-            if ( len(values) == 0 ):
+            if len(values) == 0:
                 n = max_samples
                 give_up = False
             else:
@@ -1368,16 +1505,17 @@ class Chebtech:
         min_samples = Chebtech.__default_min_samples__
         max_samples = Chebtech.__default_max_samples__
 
-        if len(values) == 0:
+        if (values is None) or (len(values) == 0):
             # The first time we are called, there are no values
             # and REFINENESTED is the same as REFINERESAMPLING.
             values, give_up = Chebtech.refine_by_resampling(op, values)
+            return values, give_up
         else:
             # Compute new n by doubling (we must do this when not resampling).
-            n = 2*len(values) - 1;
+            n = 2*len(values) - 1
             
             # n is too large:
-            if ( n > max_samples ):
+            if n > max_samples:
                 give_up = True
                 return values, give_up
             else:
@@ -1389,11 +1527,12 @@ class Chebtech:
             # x = x(2:2:end-1);
             x = x[1:-1:2]
 
-            # Shift the stored values:
-            values[:n:2] = values
+            # Insert the old values:
+            new_values = Chebtech.zeros(n)
+            new_values[:n:2] = values
             # Compute and insert new ones:
-            values[1::2] = op(x)
-            return values, give_up
+            new_values[1::2] = op(x)
+            return new_values, give_up
 
 # @staticmethod
 # def classic_check(coeffs, values=None, data=None):
