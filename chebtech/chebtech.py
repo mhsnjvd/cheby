@@ -19,7 +19,6 @@ def iszero_numerically(v, tol=None):
     else:
         return False
 
-
 class Chebtech:
     # Initialize properties of the object
     __default_dtype__ = np.complex128
@@ -135,7 +134,6 @@ class Chebtech:
             m = np.max(np.r_[nOut, 0])
             coeffs = coeffs[:m]
             return coeffs
-
 
     def values(self):
         return Chebtech.coeffs2vals(self.coeffs)
@@ -764,7 +762,44 @@ class Chebtech:
         # # Ensure f(-1) = 0:
         # lval = get(f, 'lval');
         # f.coeffs(1,:) = f.coeffs(1,:) - lval;
-        
+
+    def sample_test(self, op, values, vscale=0.0, hscale=1.0):
+        """Test an evaluation of input OP against a CHEBTECH approximation.
+        SAMPLETEST(OP, VALUES, F) evaluates both the function OP and its CHEBTECH
+        representation F at one or more points within [-1,1]. The difference of
+        these values is computed, and if this is sufficiently small (relative to
+        DATA.VSCALE and DATA.HSCALE) the test passes and returns TRUE. If the
+        difference is large, it returns FALSE. SAMPLETEST(OP, VALUES, F, DATA) will
+        test relative to the values given in DATA.VSCALE, rather than VSCALE(F).
+
+        Copyright 2016 by The University of Oxford and The Chebfun Developers.
+        See http://www.chebfun.org/ for Chebfun information.
+        """
+
+        # Set a tolerance:
+        tol = np.sqrt(np.max(np.r_[np.spacing(1), Chebtech.__default_tol__]))
+
+        # Scale TOL by the MAX(DATA.HSCALE*||F||, DATA.VSCALE). 
+        # (See standardCheck for explanation)
+        vscaleF = np.max(np.abs(values))
+        tol = tol*max(np.r_[hscale*vscaleF, vscale])
+
+        # choose points to evaluate
+        xeval = np.array([-0.35798910959666, 0.030192641195074])
+
+        # Evaluate the CHEBTECH:
+        vFun = f(xeval)
+
+        # Evaluate the op:
+        vOp = op(xeval)
+
+        # If the CHEBTECH evaluation differs from the op evaluation, SAMPLETEST failed:
+        # Relative (to vscl) error.
+        err = np.abs(vOp - vFun) 
+        if np.max(err) <= tol:
+            return True
+        else:
+            return False
 
     def sum(self):
         """
@@ -803,7 +838,7 @@ class Chebtech:
         # c(2:2:end,:) = 0;
         c[1::2] = 0.0
         # out = [ 2, 0, 2./(1-(2:n-1).^2) ] * c;
-        out = np.dot(np.r_[2, 0, 2/(1-np.r_[2:n]**2)], c)
+        out = np.dot(np.r_[2.0, 0.0, 2.0/(1.0-np.r_[2:n]**2)], c)
         return out
 
 
