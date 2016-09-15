@@ -834,6 +834,8 @@ class TestChebtechMethods(unittest.TestCase):
 
 if __name__ == '__main__':
     f = Chebtech('x + np.cos(x) - 1')
+    f = Chebtech('1 + x + x**2 + x**3 + x**4')
+    f.poly()
     suite = unittest.TestLoader().loadTestsFromTestCase(TestChebtechMethods)
     unittest.TextTestRunner(verbosity=2).run(suite)
     #suite = unittest.TestSuite()

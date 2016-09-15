@@ -30,6 +30,7 @@ class Chebtech:
     def __init__(self, fun=None, **kwargs):
         self.coeffs = np.array([], dtype=type(self).__default_dtype__)
         self.ishappy = False
+        self.fun = None
 
         keys = kwargs.keys()
         # [TODO]if 'coeffs' in keys and 'values' in keys:
@@ -51,8 +52,12 @@ class Chebtech:
     def __ctor__(self, op):
         """Adaptive construction of a chebtech object from lambda op"""
 
+        # Handle construction by string:
         if isinstance(op, str):
+            # Try to convert it to a lambda (naive)
             op = eval('lambda x: ' + op)
+
+        self.fun = op
 
         #%%%%%%%%%%%%%%%%%%%%%%%%%%% Adaptive construction. %%%%%%%%%%%%%%%%%%%%%%%%%%%%
         # Initialise empty values to pass to refine:
@@ -205,8 +210,7 @@ class Chebtech:
 
         # Set defaults:
         loglogPlot = kwargs.setdefault('loglog', False)
-        doBar = kwargs.setdefault('barplot', False)
-        domain = kwargs.setdefault('domain', np.r_[-1.0, 1.0])
+        plotBar = kwargs.setdefault('barplot', False)
 
         # [TODO]: Store the hold state of the current axis:
         # holdState = ishold
@@ -218,14 +222,14 @@ class Chebtech:
 
         # Add a tiny amount to zeros to make plots look nicer:
         if vscl > 0:
-            if doBar:
+            if plotBar:
                 absCoeffs[absCoeffs < (np.spacing(1)*vscl)/100.0] = 0.0
             else:
                 # Min of eps*vscale and the minimum non-zero coefficient:
                 min_nonzero_coeff = np.min(absCoeffs[np.nonzero(absCoeffs)])
                 absCoeffs[absCoeffs == 0.0] = np.min(np.r_[np.spacing(1)*vscl, min_nonzero_coeff])
         else:
-            # Add eps for zero CHEBTECHs:
+            # Add machine eps for zero CHEBTECHs:
             absCoeffs = absCoeffs + np.spacing(1)
 
         # Get the size:
@@ -233,11 +237,11 @@ class Chebtech:
 
         xx = np.r_[0.0:n]
         yy = absCoeffs
-        if doBar:
+        if plotBar:
             xx, yy = padData(xx, yy)
 
         # Plot the coeffs:
-        plt.semilogy(xx, yy, style=style)
+        plt.semilogy(xx, yy, style)
 
         current_axis = plt.gca()
         
@@ -266,6 +270,73 @@ class Chebtech:
 
         return current_axis
 
+    def poly(self):
+        """Polynomial coefficients of a CHEBTECH.
+        C = POLY(F) returns the polynomial coefficients of F so that 
+                F(x) = C(1)*x^N + C(2)*x^(N-1) + ... + C(N)*x + C(N+1)
+        
+        Note that unlike the MATLAB POLY command, CHEBTECH/POLY can operate on
+        array-valued CHEBTECH objects, and hence produce a matrix output. In such
+        instances, the rows of C correspond to the columns of F = [F1, F2, ...].
+        That is, 
+                F1(x) = C(1,1)*x^N + C(1,2)*x^(N-1) + ... + C(1,N)*x + C(1,N+1)
+                F2(x) = C(2,1)*x^N + C(2,2)*x^(N-1) + ... + C(2,N)*x + C(2,N+1).
+        This strange behaviour is a result of MATLAB's decision to return a row
+        vector from the POLY command, even for column vector input.
+
+        See also CHEBCOEFFS, TRIGCOEFFS, LEGCOEFFS.
+
+        Copyright 2016 by The University of Oxford and The Chebfun Developers.
+        See http://www.chebfun.org/ for Chebfun information.
+        """
+
+        #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        # [Mathematical reference]: Section 3.3 Mason & Handscomb, "Chebyshev
+        # Polynomials". Chapman & Hall/CRC (2003).
+        #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+        # Deal with empty case:
+        if not self:
+            return Chebtech.empty_array()
+
+        # Flip the Chebyshev coefficients to match Matlab ordering:
+        coeffs = np.flipud(self.coeffs)
+        n = len(coeffs)
+
+        # Coefficients on the unit interval:
+        if n <= 2:
+            # Constant and linear case:
+            out = coeffs
+        else:
+            # General case:
+            
+            # Initialise working vectors:
+            tn = Chebtech.zeros(n)
+            tnold1 = Chebtech.zeros(n)
+            tnold1[1] = 1.0
+            tnold2 = Chebtech.zeros(n)
+            tnold2[0] = 1.0
+            
+            # Initialise output:
+            out = Chebtech.zeros(n)
+            
+            # Initial step:
+            out[[0, 1]] = np.r_[0.0, coeffs[-1] * tnold2[0]] + (coeffs[-2] * tnold1[[1,0]])
+
+            # Recurrence:
+            for k in range(2, n):
+                tn[:k+1]  = np.r_[0.0, 2.0*tnold1[:k]] - np.r_[tnold2[:k-1], 0.0, 0.0]
+                out[:k+1] = coeffs[-k-1]*np.flipud(tn[:k+1]) + np.r_[0.0, out[:k]]
+                # It is important to copy here:
+                # [TODO]: tnold1[:] fails, investigate why we need explicit copy here
+                tnold2 = np.copy(tnold1)
+                tnold1 = np.copy(tn)
+
+        
+        if np.all(np.isreal(out)):
+            out = out.real
+
+        return out
 
     def __eq__(self, other):
         return self.isequal(other)
@@ -375,6 +446,7 @@ class Chebtech:
 
         # Check if coefficients are finite:
         out = np.all(np.isfinite(self.coeffs))
+        return out
 
     def isinf(self):
         """Test if a CHEBTECH is unbounded.
@@ -388,6 +460,7 @@ class Chebtech:
 
         # Check if any coefficients are infinite:
         out = np.any(np.isinf(self.coeffs))
+        return out
     
     def isnan(self):
         """Test if a CHEBTECH has any NaN values.
@@ -401,6 +474,7 @@ class Chebtech:
 
         #Check if any coefficients are NaN:
         out = np.any(np.isnan(self.coeffs))
+        return out
 
     def isreal(self):
         """True for real CHEBTECH.
@@ -1129,7 +1203,11 @@ class Chebtech:
     def __repr__(self):
         s = "Chebtech column (1 smooth piece)\n"
         s = s + "length = %s\n" % self.length()
-        #return 'Chebtech object of length %s on [-1, 1]' % self.length()
+        #if self.fun:
+        #    fun_str = inspect.getsource(self.fun).split('=')[1]
+        #    # Remove \n character at the end
+        #    fun_str = fun_str[:-1]
+        #    s = s + "Constructed via: %s" % fun_str
         return s
     def __call__(self, x):
         if isinstance(x, types.LambdaType):
@@ -1153,6 +1231,10 @@ class Chebtech:
         # fx = bary.bary(x, self.values)
         fx = Chebtech.clenshaw(x, self.coeffs)
         return fx
+
+    def __pow__(self, a):
+        """Chebtech raised to the power a."""
+        return Chebtech(lambda x: self(x)**a)
 
     @staticmethod
     def empty_array():
