@@ -4,21 +4,6 @@ import matplotlib.pyplot as plt
 import copy
 import types
 
-def iszero_numerically(v, tol=None):
-    """
-    Tests if the array v is numerically zero up to 
-    the provided tolerance in infinity norm.
-    Chebtech default tol is used if no tolerance is provided
-    """
-
-    if tol is None:
-        tol = Chebtech.__default_tol__
-
-    if np.abs(v).max() < tol:
-        return True
-    else:
-        return False
-
 class Chebtech:
     # Initialize properties of the object
     __default_dtype__ = np.complex128
